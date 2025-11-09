@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { prisma } from '@/lib/prisma'
-
-const execAsync = promisify(exec)
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // POST /api/setup - Complete database setup
 export async function POST(request: Request) {
@@ -72,43 +70,26 @@ export async function POST(request: Request) {
     // Step 2: Push schema to database (only if needed)
     if (needsSetup) {
       try {
-        console.log('Pushing schema to database...')
-        const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss')
-        steps.push({
-          step: 'schema',
-          status: 'success',
-          message: 'Schema pushed successfully',
-          output: stdout,
-        })
-        if (stderr) {
-          console.error('Schema push stderr:', stderr)
-        }
-      } catch (error: any) {
-        steps.push({
-          step: 'schema',
-          status: 'error',
-          message: error.message,
-          output: error.stdout || '',
-          errorOutput: error.stderr || '',
-        })
-        return NextResponse.json({ success: false, steps }, { status: 500 })
-      }
+        console.log('Creating database schema...')
 
-      // Step 3: Generate Prisma Client
-      try {
-        console.log('Generating Prisma Client...')
-        const { stdout } = await execAsync('npx prisma generate')
+        // Read SQL migration file
+        const sqlPath = join(process.cwd(), 'prisma', 'schema.sql')
+        const sql = readFileSync(sqlPath, 'utf-8')
+
+        // Execute SQL to create tables
+        await prisma.$executeRawUnsafe(sql)
+
         steps.push({
-          step: 'generate',
+          step: 'schema',
           status: 'success',
-          message: 'Prisma Client generated',
-          output: stdout,
+          message: 'Database schema created successfully',
         })
       } catch (error: any) {
+        console.error('Schema creation error:', error)
         steps.push({
-          step: 'generate',
+          step: 'schema',
           status: 'error',
-          message: error.message,
+          message: error.message || 'Failed to create schema',
         })
         return NextResponse.json({ success: false, steps }, { status: 500 })
       }
@@ -116,22 +97,22 @@ export async function POST(request: Request) {
       steps.push({
         step: 'schema',
         status: 'skipped',
-        message: 'Schema already exists, skipping push',
+        message: 'Schema already exists, skipping creation',
       })
     }
 
-    // Step 4: Seed database (automatically via seed API)
+    // Step 3: Database ready for seeding
     steps.push({
       step: 'ready',
       status: 'success',
-      message: 'Database ready! Now visit /api/seed to create demo users.',
+      message: 'Database ready! You can now seed the database with demo data.',
     })
 
     return NextResponse.json({
       success: true,
       message: 'Database setup completed successfully',
       steps,
-      nextStep: 'Visit /api/seed to create demo users',
+      nextStep: 'Click "Seed Database Now" button or visit /api/seed to create demo users',
     })
   } catch (error: any) {
     console.error('Setup error:', error)
@@ -154,9 +135,8 @@ export async function GET() {
       'This endpoint sets up your database automatically',
       'Steps performed:',
       '1. Check if database is initialized',
-      '2. Push Prisma schema to database',
-      '3. Generate Prisma Client',
-      '4. Ready for seeding',
+      '2. Execute SQL to create database schema (tables, indexes, foreign keys)',
+      '3. Ready for seeding',
       '',
       'To run setup, make a POST request:',
       'POST /api/setup',
