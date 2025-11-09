@@ -74,15 +74,69 @@ export async function POST(request: Request) {
 
         // Read SQL migration file
         const sqlPath = join(process.cwd(), 'prisma', 'schema.sql')
-        const sql = readFileSync(sqlPath, 'utf-8')
+        const sqlContent = readFileSync(sqlPath, 'utf-8')
 
-        // Execute SQL to create tables
-        await prisma.$executeRawUnsafe(sql)
+        // Split SQL into individual statements
+        // We need to handle DO $$ ... END $$; blocks as single statements
+        const statements: string[] = []
+        let currentStatement = ''
+        let inDoBlock = false
+
+        const lines = sqlContent.split('\n')
+
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+
+          // Skip empty lines and comments at the start
+          if (!currentStatement && (!trimmedLine || trimmedLine.startsWith('--'))) {
+            continue
+          }
+
+          currentStatement += line + '\n'
+
+          // Detect DO block start
+          if (trimmedLine.startsWith('DO $$')) {
+            inDoBlock = true
+          }
+
+          // Detect DO block end
+          if (inDoBlock && trimmedLine === 'END $$;') {
+            inDoBlock = false
+            statements.push(currentStatement.trim())
+            currentStatement = ''
+            continue
+          }
+
+          // Regular statement end (not in DO block)
+          if (!inDoBlock && trimmedLine.endsWith(';') && !trimmedLine.startsWith('--')) {
+            statements.push(currentStatement.trim())
+            currentStatement = ''
+          }
+        }
+
+        // Execute each statement
+        let successCount = 0
+        for (let i = 0; i < statements.length; i++) {
+          const stmt = statements[i]
+          if (stmt) {
+            try {
+              await prisma.$executeRawUnsafe(stmt)
+              successCount++
+            } catch (error: any) {
+              // Some errors are acceptable (e.g., "already exists")
+              if (!error.message.includes('already exists') &&
+                  !error.message.includes('duplicate')) {
+                console.error(`Error executing statement ${i + 1}:`, error.message)
+                throw error
+              }
+            }
+          }
+        }
 
         steps.push({
           step: 'schema',
           status: 'success',
-          message: 'Database schema created successfully',
+          message: `Database schema created successfully (${successCount} statements executed)`,
         })
       } catch (error: any) {
         console.error('Schema creation error:', error)
