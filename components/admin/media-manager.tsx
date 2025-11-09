@@ -80,12 +80,11 @@ export default function MediaManager({ media }: MediaManagerProps) {
           className="hidden"
           disabled={isUploading}
         />
-        <label htmlFor="file-upload">
-          <Button asChild disabled={isUploading}>
-            <span className="cursor-pointer">
-              {isUploading ? 'Uploading...' : 'Upload File'}
-            </span>
-          </Button>
+        <label
+          htmlFor="file-upload"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 cursor-pointer"
+        >
+          {isUploading ? 'Uploading...' : 'Upload File'}
         </label>
       </div>
 

@@ -6,16 +6,7 @@ import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import ArticleCard from '@/components/public/article-card'
 
-export async function generateStaticParams() {
-  const posts = await prisma.post.findMany({
-    where: { status: 'PUBLISHED' },
-    select: { slug: true },
-  })
-
-  return posts.map((post) => ({
-    slug: post.slug,
-  }))
-}
+export const dynamic = 'force-dynamic'
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const post = await prisma.post.findUnique({

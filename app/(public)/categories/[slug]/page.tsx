@@ -3,15 +3,7 @@ import { notFound } from 'next/navigation'
 import PublicLayout from '@/components/public/public-layout'
 import ArticleCard from '@/components/public/article-card'
 
-export async function generateStaticParams() {
-  const categories = await prisma.category.findMany({
-    select: { slug: true },
-  })
-
-  return categories.map((category) => ({
-    slug: category.slug,
-  }))
-}
+export const dynamic = 'force-dynamic'
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
   const category = await prisma.category.findUnique({

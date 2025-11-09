@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+export const dynamic = 'force-dynamic'
 import PublicLayout from '@/components/public/public-layout'
 import Link from 'next/link'
 
