@@ -129,12 +129,12 @@ After seeding, you can login with:
 
 ## 🌐 Deployment to Vercel
 
-### Automatic Deployment (Recommended)
+### 🚀 Zero-Touch Deployment (Recommended - No Local Commands!)
+
+Deploy and initialize your database entirely through the web - no local terminal commands needed!
 
 1. **Push to GitHub**:
 ```bash
-git add .
-git commit -m "Initial commit"
 git push origin main
 ```
 
@@ -142,20 +142,42 @@ git push origin main
    - Go to [vercel.com](https://vercel.com)
    - Click "Import Project"
    - Select your GitHub repository
-   - Add environment variables (see `.env.example`)
+   - Add environment variables:
+     ```env
+     DATABASE_URL=postgresql://...?pgbouncer=true
+     DIRECT_URL=postgresql://...
+     NEXTAUTH_URL=https://your-app.vercel.app
+     NEXTAUTH_SECRET=your-random-secret
+     SETUP_SECRET=your-setup-secret
+     ```
    - Click "Deploy"
 
-3. **Run Database Migrations**:
-After deployment, run migrations using Vercel CLI:
-```bash
-vercel env pull .env.local
-npx prisma migrate deploy
-```
+3. **Automatic Database Setup**:
+   The build process automatically:
+   - ✅ Generates Prisma Client
+   - ✅ Pushes schema to database
+   - ✅ Builds the application
 
-4. **Seed the Database**:
-Visit `https://your-domain.vercel.app/api/seed`
+   **No manual commands needed!**
 
-**For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+4. **Initialize Data (Choose One)**:
+
+   **Option A: Setup Page** (Recommended)
+   - Visit: `https://your-app.vercel.app/setup`
+   - Enter your `SETUP_SECRET`
+   - Click "Initialize Database"
+   - Click "Seed Database"
+
+   **Option B: Direct API**
+   - Visit: `https://your-app.vercel.app/api/seed`
+
+5. **Done! 🎉**
+   - Login: `https://your-app.vercel.app/login`
+   - Use: `admin@example.com` / `admin123`
+
+**📖 For complete zero-touch setup guide, see [SETUP-GUIDE.md](SETUP-GUIDE.md)**
+
+**📖 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
 ### Automatic Updates
 
