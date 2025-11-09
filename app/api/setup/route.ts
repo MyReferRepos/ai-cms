@@ -34,24 +34,39 @@ export async function POST(request: Request) {
 
     const steps: any[] = []
 
-    // Step 1: Check if database tables exist
+    // Step 1: Check if tables exist using raw SQL query
     let needsSetup = false
     try {
-      await prisma.user.count()
-      // If we get here, tables exist - check if there's data
-      const userCount = await prisma.user.count()
-      if (userCount > 0) {
-        return NextResponse.json({
-          success: true,
-          message: 'Database already initialized',
-          steps: [{ step: 'check', status: 'skipped', message: 'Database already has data' }],
-        })
+      // Use raw SQL to check if tables exist without causing Prisma errors
+      const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'users'
+        );
+      `
+
+      const tablesExist = result[0]?.exists || false
+
+      if (tablesExist) {
+        // Tables exist, check if there's data
+        const userCount = await prisma.user.count()
+        if (userCount > 0) {
+          return NextResponse.json({
+            success: true,
+            message: 'Database already initialized',
+            steps: [{ step: 'check', status: 'skipped', message: 'Database already has data' }],
+          })
+        }
+        steps.push({ step: 'check', status: 'success', message: 'Tables exist, ready for seeding' })
+      } else {
+        needsSetup = true
+        steps.push({ step: 'check', status: 'pending', message: 'Tables not found, will create schema' })
       }
-      steps.push({ step: 'check', status: 'success', message: 'Tables exist, ready for seeding' })
     } catch (error: any) {
-      // Tables don't exist yet, need to run db push
+      // If even the schema check fails, definitely need setup
       needsSetup = true
-      steps.push({ step: 'check', status: 'pending', message: 'Tables not found, will create schema' })
+      steps.push({ step: 'check', status: 'pending', message: 'Database needs initialization' })
     }
 
     // Step 2: Push schema to database (only if needed)
