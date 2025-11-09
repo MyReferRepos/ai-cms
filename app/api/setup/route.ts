@@ -34,8 +34,11 @@ export async function POST(request: Request) {
 
     const steps: any[] = []
 
-    // Step 1: Check if database is already set up
+    // Step 1: Check if database tables exist
+    let needsSetup = false
     try {
+      await prisma.user.count()
+      // If we get here, tables exist - check if there's data
       const userCount = await prisma.user.count()
       if (userCount > 0) {
         return NextResponse.json({
@@ -44,52 +47,62 @@ export async function POST(request: Request) {
           steps: [{ step: 'check', status: 'skipped', message: 'Database already has data' }],
         })
       }
-    } catch (error) {
-      // Database might not be initialized yet, continue with setup
-      steps.push({ step: 'check', status: 'pending', message: 'Database needs initialization' })
+      steps.push({ step: 'check', status: 'success', message: 'Tables exist, ready for seeding' })
+    } catch (error: any) {
+      // Tables don't exist yet, need to run db push
+      needsSetup = true
+      steps.push({ step: 'check', status: 'pending', message: 'Tables not found, will create schema' })
     }
 
-    // Step 2: Push schema to database
-    try {
-      console.log('Pushing schema to database...')
-      const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss')
-      steps.push({
-        step: 'schema',
-        status: 'success',
-        message: 'Schema pushed successfully',
-        output: stdout,
-      })
-      if (stderr) {
-        console.error('Schema push stderr:', stderr)
+    // Step 2: Push schema to database (only if needed)
+    if (needsSetup) {
+      try {
+        console.log('Pushing schema to database...')
+        const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss')
+        steps.push({
+          step: 'schema',
+          status: 'success',
+          message: 'Schema pushed successfully',
+          output: stdout,
+        })
+        if (stderr) {
+          console.error('Schema push stderr:', stderr)
+        }
+      } catch (error: any) {
+        steps.push({
+          step: 'schema',
+          status: 'error',
+          message: error.message,
+          output: error.stdout || '',
+          errorOutput: error.stderr || '',
+        })
+        return NextResponse.json({ success: false, steps }, { status: 500 })
       }
-    } catch (error: any) {
+
+      // Step 3: Generate Prisma Client
+      try {
+        console.log('Generating Prisma Client...')
+        const { stdout } = await execAsync('npx prisma generate')
+        steps.push({
+          step: 'generate',
+          status: 'success',
+          message: 'Prisma Client generated',
+          output: stdout,
+        })
+      } catch (error: any) {
+        steps.push({
+          step: 'generate',
+          status: 'error',
+          message: error.message,
+        })
+        return NextResponse.json({ success: false, steps }, { status: 500 })
+      }
+    } else {
       steps.push({
         step: 'schema',
-        status: 'error',
-        message: error.message,
-        output: error.stdout || '',
-        errorOutput: error.stderr || '',
+        status: 'skipped',
+        message: 'Schema already exists, skipping push',
       })
-      return NextResponse.json({ success: false, steps }, { status: 500 })
-    }
-
-    // Step 3: Generate Prisma Client
-    try {
-      console.log('Generating Prisma Client...')
-      const { stdout } = await execAsync('npx prisma generate')
-      steps.push({
-        step: 'generate',
-        status: 'success',
-        message: 'Prisma Client generated',
-        output: stdout,
-      })
-    } catch (error: any) {
-      steps.push({
-        step: 'generate',
-        status: 'error',
-        message: error.message,
-      })
-      return NextResponse.json({ success: false, steps }, { status: 500 })
     }
 
     // Step 4: Seed database (automatically via seed API)
