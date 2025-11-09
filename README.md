@@ -142,10 +142,9 @@ git push origin main
    - Go to [vercel.com](https://vercel.com)
    - Click "Import Project"
    - Select your GitHub repository
-   - Add environment variables:
+   - Add environment variables (from your Supabase project):
      ```env
-     DATABASE_URL=postgresql://...?pgbouncer=true
-     DIRECT_URL=postgresql://...
+     DATABASE_URL=postgresql://postgres.xxx:password@aws-x-region.pooler.supabase.com:6543/postgres
      NEXTAUTH_URL=https://your-app.vercel.app
      NEXTAUTH_SECRET=your-random-secret
      SETUP_SECRET=your-setup-secret
