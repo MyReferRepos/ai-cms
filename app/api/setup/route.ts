@@ -8,7 +8,20 @@ const execAsync = promisify(exec)
 // POST /api/setup - Complete database setup
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    // Parse request body safely
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text && text.trim()) {
+        body = JSON.parse(text)
+      }
+    } catch (parseError) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+
     const { secret } = body
 
     // Simple authentication
