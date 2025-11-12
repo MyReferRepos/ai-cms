@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { deleteManyFromS3 } from '@/lib/s3'
+import { deleteManyFromStorage } from '@/lib/storage'
 
 // POST /api/media/batch-delete - Delete multiple media files
 export async function POST(request: NextRequest) {
@@ -65,12 +65,12 @@ export async function POST(request: NextRequest) {
       if (media.mediumUrl) urlsToDelete.push(media.mediumUrl)
     })
 
-    // Delete from S3
+    // Delete from storage
     try {
-      await deleteManyFromS3(urlsToDelete)
+      await deleteManyFromStorage(urlsToDelete)
     } catch (error) {
-      console.error('Error deleting from S3:', error)
-      // Continue to delete from database even if S3 deletion fails
+      console.error('Error deleting from storage:', error)
+      // Continue to delete from database even if storage deletion fails
     }
 
     // Delete from database
