@@ -1,4 +1,4 @@
-# AI CMS - Multi-User Content Management System
+# AI CMS - Multi-User Content Management System created by AI.
 
 A fully-featured, production-ready CMS built with Next.js 14, Prisma, Supabase, and Tailwind CSS. Features a robust multi-user system with role-based access control and a beautiful public-facing frontend.
 
