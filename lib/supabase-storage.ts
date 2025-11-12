@@ -49,7 +49,16 @@ export async function uploadToSupabase(
   const client = getSupabaseClient()
   const filePath = `media/${filename}`
 
-  const { data, error} = await client.storage
+  // Log upload attempt for debugging
+  console.log('[Supabase Upload] Attempting upload:', {
+    bucket: storageBucket,
+    filePath,
+    mimeType,
+    fileSize: fileBuffer.length,
+    supabaseUrl: supabaseUrl.substring(0, 30) + '...',
+  })
+
+  const { data, error } = await client.storage
     .from(storageBucket)
     .upload(filePath, fileBuffer, {
       contentType: mimeType,
@@ -58,14 +67,22 @@ export async function uploadToSupabase(
     })
 
   if (error) {
-    console.error('Supabase upload error:', error)
+    console.error('[Supabase Upload] Error details:', {
+      message: error.message,
+      statusCode: (error as any).statusCode,
+      error: error,
+    })
     throw new Error(`Failed to upload to Supabase: ${error.message}`)
   }
+
+  console.log('[Supabase Upload] Success:', data)
 
   // Generate public URL
   const { data: { publicUrl } } = client.storage
     .from(storageBucket)
     .getPublicUrl(filePath)
+
+  console.log('[Supabase Upload] Public URL:', publicUrl)
 
   return publicUrl
 }
