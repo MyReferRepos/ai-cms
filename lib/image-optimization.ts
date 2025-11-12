@@ -1,5 +1,8 @@
 import sharp from 'sharp'
-import { isImage } from './file-validation'
+import { isImage as isImageType } from './file-validation'
+
+// Re-export for convenience
+export { isImage } from './file-validation'
 
 export interface OptimizedImage {
   original: Buffer
@@ -27,7 +30,7 @@ export async function optimizeImage(
   mimeType: string,
   generateThumbnail = true
 ): Promise<OptimizedImage> {
-  if (!isImage(mimeType)) {
+  if (!isImageType(mimeType)) {
     return {
       original: buffer,
       optimized: buffer,
