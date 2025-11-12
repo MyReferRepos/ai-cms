@@ -106,7 +106,32 @@ https://your-project-id.supabase.co
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-⚠️ **重要**：使用 `service_role` 密钥（不是 `anon` 密钥），因为需要绕过 RLS 在后端操作。
+⚠️ **关于 service_role key 的安全说明**：
+
+**为什么使用 service_role key？**
+- 上传是在**服务端 API** 完成的（不是客户端）
+- 需要在服务端使用 Sharp 库进行图像优化和缩略图生成
+- 权限验证由 **NextAuth** 在应用层完成（已验证用户角色）
+
+**这样使用是安全的吗？**
+✅ **是的，只要遵循以下规则**：
+1. ✅ **仅在服务端使用**：密钥存储在环境变量中，不暴露给客户端
+2. ✅ **不提交到 Git**：`.env` 已在 `.gitignore` 中
+3. ✅ **Vercel 加密存储**：在 Vercel 环境变量中安全存储
+4. ✅ **应用层权限控制**：NextAuth 已验证 ADMIN/EDITOR/AUTHOR 角色
+
+**Supabase 的警告主要针对**：
+- ❌ 在客户端 JavaScript 中使用 service_role key
+- ❌ 提交到公开的 Git 仓库
+- ❌ 没有应用层的权限验证
+
+**你的架构是安全的**：
+```
+用户 → NextAuth 验证 → API (/api/media) → Supabase Storage
+         ✅ 权限检查          ✅ service_role       ✅ 上传
+```
+
+**业界标准**：在服务端 API 中使用 service_role key 进行操作是**常见且被接受的做法**，前提是有严格的应用层权限控制（你已经有了）。
 
 ### 第 4 步：配置环境变量
 
