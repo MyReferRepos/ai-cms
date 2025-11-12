@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { uploadToS3, validateS3Config } from '@/lib/s3'
+import { uploadToStorage, validateStorageConfig } from '@/lib/storage'
 import { validateFile, generateUniqueFilename, getFileCategory } from '@/lib/file-validation'
 import { optimizeImage, getImageDimensions, getThumbnailFilename, getMediumFilename, isImage } from '@/lib/image-optimization'
 
@@ -111,14 +111,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Validate S3 configuration
-    const s3Validation = validateS3Config()
-    if (!s3Validation.valid) {
-      console.error('S3 configuration errors:', s3Validation.errors)
+    // Validate storage configuration
+    const storageValidation = validateStorageConfig()
+    if (!storageValidation.valid) {
+      console.error('Storage configuration errors:', storageValidation.errors)
       return NextResponse.json(
         {
-          error: 'S3 storage is not configured',
-          details: s3Validation.errors,
+          error: `${storageValidation.provider} is not configured`,
+          details: storageValidation.errors,
         },
         { status: 500 }
       )
@@ -170,22 +170,22 @@ export async function POST(request: NextRequest) {
       const optimized = await optimizeImage(buffer, file.type, true)
 
       // Upload original/optimized version
-      url = await uploadToS3(optimized.optimized, filename, file.type)
+      url = await uploadToStorage(optimized.optimized, filename, file.type)
 
       // Upload thumbnail if generated
       if (optimized.thumbnail) {
         const thumbFilename = getThumbnailFilename(filename)
-        thumbnailUrl = await uploadToS3(optimized.thumbnail, thumbFilename, file.type)
+        thumbnailUrl = await uploadToStorage(optimized.thumbnail, thumbFilename, file.type)
       }
 
       // Upload medium size if generated
       if (optimized.medium) {
         const mediumFilename = getMediumFilename(filename)
-        mediumUrl = await uploadToS3(optimized.medium, mediumFilename, file.type)
+        mediumUrl = await uploadToStorage(optimized.medium, mediumFilename, file.type)
       }
     } else {
       // Upload non-image files as-is
-      url = await uploadToS3(buffer, filename, file.type)
+      url = await uploadToStorage(buffer, filename, file.type)
     }
 
     // Save to database

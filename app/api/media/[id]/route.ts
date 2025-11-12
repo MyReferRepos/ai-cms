@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { deleteFromS3 } from '@/lib/s3'
+import { deleteFromStorage } from '@/lib/storage'
 
 // DELETE /api/media/[id] - Delete media file
 export async function DELETE(
@@ -35,25 +35,25 @@ export async function DELETE(
       )
     }
 
-    // Delete from S3
+    // Delete from storage
     try {
-      await deleteFromS3(media.url)
+      await deleteFromStorage(media.url)
 
       // Delete thumbnails if they exist
       if (media.thumbnailUrl) {
-        await deleteFromS3(media.thumbnailUrl).catch(err =>
+        await deleteFromStorage(media.thumbnailUrl).catch(err =>
           console.error('Failed to delete thumbnail:', err)
         )
       }
 
       if (media.mediumUrl) {
-        await deleteFromS3(media.mediumUrl).catch(err =>
+        await deleteFromStorage(media.mediumUrl).catch(err =>
           console.error('Failed to delete medium size:', err)
         )
       }
     } catch (error) {
-      console.error('Error deleting from S3:', error)
-      // Continue to delete from database even if S3 deletion fails
+      console.error('Error deleting from storage:', error)
+      // Continue to delete from database even if storage deletion fails
     }
 
     // Delete from database
