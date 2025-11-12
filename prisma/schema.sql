@@ -82,7 +82,11 @@ CREATE TABLE IF NOT EXISTS "media" (
     "mimeType" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
     "url" TEXT NOT NULL,
+    "thumbnailUrl" TEXT,
+    "mediumUrl" TEXT,
     "alt" TEXT,
+    "width" INTEGER,
+    "height" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "uploadedById" TEXT NOT NULL,
 
@@ -134,6 +138,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "tags_slug_key" ON "tags"("slug");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "media_uploadedById_idx" ON "media"("uploadedById");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "media_mimeType_idx" ON "media"("mimeType");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "comments_postId_idx" ON "comments"("postId");

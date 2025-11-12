@@ -39,7 +39,7 @@ export default async function MediaPage() {
           <CardTitle>All Media ({media.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <MediaManager media={media} />
+          <MediaManager initialMedia={media} />
         </CardContent>
       </Card>
     </div>
