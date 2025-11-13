@@ -166,8 +166,9 @@ model FacebookAccount {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   facebookPosts   FacebookPost[]
+  bestTimes       FacebookBestTime[]
 
   @@index([userId])
   @@index([pageId])
@@ -229,4 +230,25 @@ model FacebookGroup {
   @@index([groupId])
   @@index([lastPostAt])
   @@map("facebook_groups")
+}
+
+model FacebookBestTime {
+  id                String   @id @default(cuid())
+  facebookAccountId String
+  dayOfWeek         Int      // 0-6 (Sunday to Saturday)
+  hour              Int      // 0-23
+  score             Float    // Engagement score (0-100)
+  avgEngagement     Float    // Average engagement rate
+  avgReach          Int      // Average reach
+  sampleSize        Int      // Number of posts analyzed
+  lastAnalyzedAt    DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([facebookAccountId, dayOfWeek, hour])
+  @@index([facebookAccountId])
+  @@index([score])
+  @@map("facebook_best_times")
 }

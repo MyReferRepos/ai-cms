@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AlertCircle, Send, Loader2 } from 'lucide-react'
+import { AlertCircle, Send, Loader2, ChevronDown, ChevronUp, Clock, TrendingUp } from 'lucide-react'
+import FacebookBestTimes from './facebook-best-times'
+import { formatDistanceToNow } from 'date-fns'
 
 interface FacebookAccount {
   id: string
@@ -31,6 +33,11 @@ export default function FacebookPublisher() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [showBestTimes, setShowBestTimes] = useState(false)
+  const [nextRecommendedTime, setNextRecommendedTime] = useState<{
+    nextTime: string
+    recommendation: any
+  } | null>(null)
 
   useEffect(() => {
     fetchAccounts()
@@ -48,6 +55,30 @@ export default function FacebookPublisher() {
       }
     }
   }, [selectedPost, posts])
+
+  useEffect(() => {
+    // Fetch next recommended time when account is selected
+    if (selectedAccount) {
+      fetchNextRecommendedTime()
+    } else {
+      setNextRecommendedTime(null)
+    }
+  }, [selectedAccount])
+
+  const fetchNextRecommendedTime = async () => {
+    try {
+      const account = accounts.find(a => a.id === selectedAccount)
+      if (!account) return
+
+      const response = await fetch(`/api/facebook/analytics/next-time?pageId=${account.pageId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setNextRecommendedTime(data)
+      }
+    } catch (err) {
+      console.error('Error fetching next recommended time:', err)
+    }
+  }
 
   const fetchAccounts = async () => {
     try {
@@ -245,6 +276,38 @@ export default function FacebookPublisher() {
                   <span className="text-xs text-muted-foreground">(no image available)</span>
                 )}
               </label>
+            </div>
+          )}
+
+          {/* Best Times Section */}
+          {selectedAccount && (
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowBestTimes(!showBestTimes)}
+                className="w-full p-4 flex items-center justify-between bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="text-sm font-medium">Best Times to Post</span>
+                  {nextRecommendedTime && (
+                    <span className="text-xs text-muted-foreground">
+                      • Next: {formatDistanceToNow(new Date(nextRecommendedTime.nextTime), { addSuffix: true })}
+                    </span>
+                  )}
+                </div>
+                {showBestTimes ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+
+              {showBestTimes && (
+                <div className="p-4 border-t">
+                  <FacebookBestTimes pageId={accounts.find(a => a.id === selectedAccount)?.pageId || ''} />
+                </div>
+              )}
             </div>
           )}
 

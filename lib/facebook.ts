@@ -487,3 +487,218 @@ export async function verifyUserToken(
     return { isValid: false }
   }
 }
+
+// ============================================================================
+// Facebook Insights & Analytics API
+// ============================================================================
+
+export interface PagePost {
+  id: string
+  message?: string
+  created_time: string
+  permalink_url?: string
+}
+
+export interface PostInsightsData {
+  postId: string
+  impressions: number
+  reach: number
+  engagement: number
+  likes: number
+  comments: number
+  shares: number
+  reactions: number
+  clicks: number
+}
+
+export interface FansOnlineData {
+  hour: number
+  value: number
+}
+
+export interface BestTimeRecommendation {
+  dayOfWeek: number
+  hour: number
+  score: number
+  engagementRate: number
+  avgReach: number
+  confidence: 'high' | 'medium' | 'low'
+}
+
+/**
+ * Get page posts for analysis
+ * @param pageId Facebook page ID
+ * @param pageAccessToken Page access token
+ * @param limit Number of posts to fetch (max 100)
+ * @param since Optional start date (UNIX timestamp)
+ */
+export async function getPagePosts(
+  pageId: string,
+  pageAccessToken: string,
+  limit: number = 100,
+  since?: number
+): Promise<PagePost[]> {
+  try {
+    let url = `https://graph.facebook.com/v18.0/${pageId}/posts?` +
+      `fields=id,message,created_time,permalink_url&` +
+      `limit=${limit}&` +
+      `access_token=${pageAccessToken}`
+
+    if (since) {
+      url += `&since=${since}`
+    }
+
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Facebook API error: ${error.error?.message || 'Unknown error'}`)
+    }
+
+    const data = await response.json()
+    return data.data || []
+  } catch (error) {
+    console.error('Error fetching page posts:', error)
+    throw error
+  }
+}
+
+/**
+ * Get detailed insights for a specific post
+ */
+export async function getPostInsightsDetailed(
+  postId: string,
+  pageAccessToken: string
+): Promise<PostInsightsData> {
+  try {
+    // Get post insights
+    const insightsResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${postId}/insights?` +
+      `metric=post_impressions,post_impressions_unique,post_engaged_users,` +
+      `post_clicks,post_reactions_like_total,post_reactions_love_total,` +
+      `post_reactions_wow_total,post_reactions_haha_total,post_reactions_sorry_total,` +
+      `post_reactions_anger_total&` +
+      `access_token=${pageAccessToken}`
+    )
+
+    // Get basic engagement data
+    const postResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${postId}?` +
+      `fields=likes.summary(true),comments.summary(true),shares&` +
+      `access_token=${pageAccessToken}`
+    )
+
+    if (!insightsResponse.ok || !postResponse.ok) {
+      throw new Error('Failed to fetch post insights')
+    }
+
+    const insightsData = await insightsResponse.json()
+    const postData = await postResponse.json()
+
+    // Parse insights metrics
+    const metrics: any = {}
+    if (insightsData.data) {
+      insightsData.data.forEach((metric: any) => {
+        if (metric.values && metric.values.length > 0) {
+          metrics[metric.name] = metric.values[0].value || 0
+        }
+      })
+    }
+
+    const likes = postData.likes?.summary?.total_count || 0
+    const comments = postData.comments?.summary?.total_count || 0
+    const shares = postData.shares?.count || 0
+
+    // Calculate total reactions
+    const reactions =
+      (metrics.post_reactions_like_total || 0) +
+      (metrics.post_reactions_love_total || 0) +
+      (metrics.post_reactions_wow_total || 0) +
+      (metrics.post_reactions_haha_total || 0) +
+      (metrics.post_reactions_sorry_total || 0) +
+      (metrics.post_reactions_anger_total || 0)
+
+    return {
+      postId,
+      impressions: metrics.post_impressions || 0,
+      reach: metrics.post_impressions_unique || 0,
+      engagement: metrics.post_engaged_users || 0,
+      likes,
+      comments,
+      shares,
+      reactions,
+      clicks: metrics.post_clicks || 0,
+    }
+  } catch (error) {
+    console.error('Error fetching post insights:', error)
+    // Return zeros if we can't get insights
+    return {
+      postId,
+      impressions: 0,
+      reach: 0,
+      engagement: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      reactions: 0,
+      clicks: 0,
+    }
+  }
+}
+
+/**
+ * Get fans online data (when fans are typically online)
+ */
+export async function getFansOnlineData(
+  pageId: string,
+  pageAccessToken: string
+): Promise<Record<number, FansOnlineData[]>> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${pageId}/insights/page_fans_online?` +
+      `period=week&` +
+      `access_token=${pageAccessToken}`
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      console.warn('Fans online data not available:', error.error?.message)
+      return {}
+    }
+
+    const data = await response.json()
+
+    if (!data.data || data.data.length === 0) {
+      return {}
+    }
+
+    // Parse the data structure
+    // Format: { "0": { "0": value, "1": value, ... }, "1": { ... }, ... }
+    // Where first key is day of week (0-6), second key is hour (0-23)
+    const fansOnlineByDay: Record<number, FansOnlineData[]> = {}
+
+    if (data.data[0]?.values && data.data[0].values.length > 0) {
+      const latestValue = data.data[0].values[data.data[0].values.length - 1].value
+
+      for (const [dayStr, hourData] of Object.entries(latestValue)) {
+        const day = parseInt(dayStr)
+        fansOnlineByDay[day] = []
+
+        if (typeof hourData === 'object' && hourData !== null) {
+          for (const [hourStr, value] of Object.entries(hourData)) {
+            const hour = parseInt(hourStr)
+            fansOnlineByDay[day].push({
+              hour,
+              value: value as number,
+            })
+          }
+        }
+      }
+    }
+
+    return fansOnlineByDay
+  } catch (error) {
+    console.error('Error fetching fans online data:', error)
+    return {}
+  }
+}

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     'pages_read_engagement',        // Read page engagement data
     'pages_manage_posts',           // Create, edit and delete posts
     'pages_manage_engagement',      // Manage comments, reactions
+    'read_insights',                // Read page insights for analytics
     'groups_access_member_info',    // Access group member info
     'publish_to_groups',            // Publish to groups
   ].join(',')
