@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
         data: {
           facebookAccountId,
           postId: postId || null,
+          userId: session.user.id,
           message,
           link: link || null,
           imageUrl: imageUrl || null,
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest) {
         data: {
           facebookAccountId,
           postId: postId || null,
+          userId: session.user.id,
           facebookPostId: publishResult.id,
           message,
           link: link || null,
@@ -197,6 +199,7 @@ export async function POST(request: NextRequest) {
         data: {
           facebookAccountId,
           postId: postId || null,
+          userId: session.user.id,
           message,
           link: link || null,
           imageUrl: imageUrl || null,
