@@ -25,25 +25,49 @@ npx prisma migrate dev --name add_facebook_tables
 
 If you prefer to run SQL directly or if you're using a managed database service:
 
+⚠️ **Risks**:
+- May cause constraint errors if executed multiple times
+- Prisma won't track this migration
+- Partial execution possible if errors occur
+
+✅ **Recommended**: Use the safe version with transaction:
+
 1. Connect to your PostgreSQL database using your preferred client (psql, pgAdmin, Supabase Dashboard, etc.)
 
-2. Execute the SQL file:
+2. Execute the **SAFE** SQL file (with transaction):
    ```bash
-   psql $DATABASE_URL -f prisma/add_facebook_tables_migration.sql
+   psql $DATABASE_URL -f prisma/add_facebook_tables_migration_safe.sql
    ```
 
-   Or copy and paste the contents of `prisma/add_facebook_tables_migration.sql` into your database client.
+   Or copy and paste the contents of `prisma/add_facebook_tables_migration_safe.sql` into your database client.
 
-### Method 3: Using Supabase Dashboard
+   The safe version:
+   - ✅ Wraps everything in a transaction (auto-rollback on error)
+   - ✅ Checks if constraints exist before adding
+   - ✅ Includes verification query at the end
+   - ✅ Can be safely re-run
 
-If you're using Supabase:
+### Method 3: Using Supabase Dashboard (Recommended for Supabase users)
+
+If you're using Supabase - **This is the safest and easiest method**:
 
 1. Go to your Supabase project dashboard
 2. Navigate to **SQL Editor**
 3. Create a new query
-4. Copy the contents of `prisma/add_facebook_tables_migration.sql`
+4. Copy the contents of `prisma/add_facebook_tables_migration_safe.sql`
 5. Paste and run the query
-6. Verify tables were created in the **Table Editor**
+6. Check the results - you should see a verification table showing:
+   - facebook_accounts (11 columns)
+   - facebook_groups (11 columns)
+   - facebook_posts (13 columns)
+   - facebook_best_times (9 columns)
+7. Verify tables were created in the **Table Editor**
+
+✅ **Advantages**:
+- Supabase automatically wraps queries in transactions
+- Visual feedback on success/failure
+- Can easily rollback if needed
+- No command-line tools required
 
 ## Tables Created
 
