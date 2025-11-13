@@ -35,9 +35,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  posts         Post[]
-  media         Media[]
-  comments      Comment[]
+  posts            Post[]
+  media            Media[]
+  comments         Comment[]
+  facebookAccounts FacebookAccount[]
+  facebookGroups   FacebookGroup[]
 
   @@map("users")
 }
@@ -60,8 +62,9 @@ model Post {
   categoryId  String?
   category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  tags        PostTag[]
-  comments    Comment[]
+  tags          PostTag[]
+  comments      Comment[]
+  facebookPosts FacebookPost[]
 
   @@index([authorId])
   @@index([categoryId])
@@ -143,4 +146,109 @@ model Comment {
   @@index([postId])
   @@index([authorId])
   @@map("comments")
+}
+
+enum FacebookPostStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+  DELETED
+}
+
+model FacebookAccount {
+  id              String   @id @default(cuid())
+  userId          String
+  pageId          String   @unique
+  pageName        String
+  pageAccessToken String   // Encrypted token
+  tokenExpiresAt  DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facebookPosts   FacebookPost[]
+  bestTimes       FacebookBestTime[]
+
+  @@index([userId])
+  @@index([pageId])
+  @@map("facebook_accounts")
+}
+
+model FacebookPost {
+  id                 String             @id @default(cuid())
+  postId             String?
+  facebookAccountId  String?
+  facebookGroupId    String?
+  facebookPostId     String?            // Facebook's post ID
+  status             FacebookPostStatus @default(PENDING)
+  message            String
+  link               String?
+  imageUrl           String?
+  publishedAt        DateTime?
+  scheduledAt        DateTime?
+  likes              Int?
+  shares             Int?
+  comments           Int?
+  reach              Int?
+  errorMessage       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  post               Post?              @relation(fields: [postId], references: [id], onDelete: SetNull)
+  facebookAccount    FacebookAccount?   @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  facebookGroup      FacebookGroup?     @relation(fields: [facebookGroupId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([facebookAccountId])
+  @@index([facebookGroupId])
+  @@index([status])
+  @@index([facebookPostId])
+  @@map("facebook_posts")
+}
+
+model FacebookGroup {
+  id                 String   @id @default(cuid())
+  userId             String
+  groupId            String   @unique
+  groupName          String
+  groupDescription   String?
+  memberCount        Int?
+  privacy            String?  // PUBLIC, CLOSED, SECRET
+  userAccessToken    String   // Encrypted token
+  tokenExpiresAt     DateTime?
+  isActive           Boolean  @default(true)
+  lastPostAt         DateTime? // Last time user posted to this group
+  lastPostCheckedAt  DateTime? // Last time we checked for posts
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facebookPosts      FacebookPost[]
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([lastPostAt])
+  @@map("facebook_groups")
+}
+
+model FacebookBestTime {
+  id                String   @id @default(cuid())
+  facebookAccountId String
+  dayOfWeek         Int      // 0-6 (Sunday to Saturday)
+  hour              Int      // 0-23
+  score             Float    // Engagement score (0-100)
+  avgEngagement     Float    // Average engagement rate
+  avgReach          Int      // Average reach
+  sampleSize        Int      // Number of posts analyzed
+  lastAnalyzedAt    DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([facebookAccountId, dayOfWeek, hour])
+  @@index([facebookAccountId])
+  @@index([score])
+  @@map("facebook_best_times")
 }

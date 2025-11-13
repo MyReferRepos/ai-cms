@@ -23,6 +23,7 @@ export default function AdminNav({ user }: AdminNavProps) {
     { href: '/admin/users', label: 'Users', roles: ['ADMIN'] },
     { href: '/admin/categories', label: 'Categories', roles: ['ADMIN', 'EDITOR'] },
     { href: '/admin/media', label: 'Media', roles: ['ADMIN', 'EDITOR', 'AUTHOR'] },
+    { href: '/admin/facebook', label: 'Facebook', roles: ['ADMIN', 'EDITOR', 'AUTHOR'] },
   ]
 
   const visibleNavItems = navItems.filter(item =>
