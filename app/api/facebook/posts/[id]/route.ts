@@ -29,6 +29,15 @@ export async function GET(
             pageAccessToken: true,
           },
         },
+        facebookGroup: {
+          select: {
+            id: true,
+            groupId: true,
+            groupName: true,
+            userId: true,
+            userAccessToken: true,
+          },
+        },
         post: {
           select: {
             id: true,
@@ -46,15 +55,16 @@ export async function GET(
     }
 
     // Check ownership
+    const ownerId = facebookPost.facebookAccount?.userId || facebookPost.facebookGroup?.userId
     if (
-      facebookPost.facebookAccount.userId !== session.user.id &&
+      ownerId !== session.user.id &&
       session.user.role !== 'ADMIN'
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Try to fetch latest insights if post is published
-    if (facebookPost.status === 'PUBLISHED' && facebookPost.facebookPostId) {
+    if (facebookPost.status === 'PUBLISHED' && facebookPost.facebookPostId && facebookPost.facebookAccount) {
       try {
         const pageAccessToken = decrypt(facebookPost.facebookAccount.pageAccessToken)
         const insights = await getPostInsights(
@@ -80,11 +90,16 @@ export async function GET(
           shares: insights.shares,
           comments: insights.comments,
           reach: insights.reach,
-          facebookAccount: {
+          facebookAccount: facebookPost.facebookAccount ? {
             id: facebookPost.facebookAccount.id,
             pageId: facebookPost.facebookAccount.pageId,
             pageName: facebookPost.facebookAccount.pageName,
-          },
+          } : null,
+          facebookGroup: facebookPost.facebookGroup ? {
+            id: facebookPost.facebookGroup.id,
+            groupId: facebookPost.facebookGroup.groupId,
+            groupName: facebookPost.facebookGroup.groupName,
+          } : null,
         }
 
         return NextResponse.json(response)
@@ -97,11 +112,16 @@ export async function GET(
     // Remove sensitive data
     const response = {
       ...facebookPost,
-      facebookAccount: {
+      facebookAccount: facebookPost.facebookAccount ? {
         id: facebookPost.facebookAccount.id,
         pageId: facebookPost.facebookAccount.pageId,
         pageName: facebookPost.facebookAccount.pageName,
-      },
+      } : null,
+      facebookGroup: facebookPost.facebookGroup ? {
+        id: facebookPost.facebookGroup.id,
+        groupId: facebookPost.facebookGroup.groupId,
+        groupName: facebookPost.facebookGroup.groupName,
+      } : null,
     }
 
     return NextResponse.json(response)
@@ -135,6 +155,12 @@ export async function DELETE(
             pageAccessToken: true,
           },
         },
+        facebookGroup: {
+          select: {
+            userId: true,
+            userAccessToken: true,
+          },
+        },
       },
     })
 
@@ -143,15 +169,16 @@ export async function DELETE(
     }
 
     // Check ownership
+    const ownerId = facebookPost.facebookAccount?.userId || facebookPost.facebookGroup?.userId
     if (
-      facebookPost.facebookAccount.userId !== session.user.id &&
+      ownerId !== session.user.id &&
       session.user.role !== 'ADMIN'
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Try to delete from Facebook if it was published
-    if (facebookPost.status === 'PUBLISHED' && facebookPost.facebookPostId) {
+    if (facebookPost.status === 'PUBLISHED' && facebookPost.facebookPostId && facebookPost.facebookAccount) {
       try {
         const pageAccessToken = decrypt(facebookPost.facebookAccount.pageAccessToken)
         await deleteFacebookPost(facebookPost.facebookPostId, pageAccessToken)

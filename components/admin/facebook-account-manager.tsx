@@ -226,7 +226,7 @@ export default function FacebookAccountManager() {
       <div className="mt-6 p-4 bg-muted rounded-lg">
         <h4 className="text-sm font-semibold mb-2">Setup Instructions</h4>
         <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-          <li>Click "Connect Facebook Page" button above</li>
+          <li>Click &quot;Connect Facebook Page&quot; button above</li>
           <li>Sign in to your Facebook account if needed</li>
           <li>Select the Facebook page you want to connect</li>
           <li>Grant the required permissions for posting</li>

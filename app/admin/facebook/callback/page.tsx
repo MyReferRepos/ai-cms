@@ -128,7 +128,7 @@ export default function FacebookCallbackPage() {
 
     try {
       // Connect each selected page
-      for (const pageId of selectedPages) {
+      for (const pageId of Array.from(selectedPages)) {
         const page = pages.find(p => p.id === pageId)
         if (!page) continue
 
@@ -151,7 +151,7 @@ export default function FacebookCallbackPage() {
       }
 
       // Connect each selected group
-      for (const groupId of selectedGroups) {
+      for (const groupId of Array.from(selectedGroups)) {
         const group = groups.find(g => g.id === groupId)
         if (!group) continue
 

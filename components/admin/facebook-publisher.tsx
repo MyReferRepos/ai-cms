@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertCircle, Send, Loader2 } from 'lucide-react'
 
 interface FacebookAccount {
@@ -173,37 +172,36 @@ export default function FacebookPublisher() {
               <label className="text-sm font-medium mb-2 block">
                 Facebook Page
               </label>
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a Facebook page" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.pageName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Select a Facebook page</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.pageName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="text-sm font-medium mb-2 block">
                 Post (Optional)
               </label>
-              <Select value={selectedPost} onValueChange={setSelectedPost}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a post or write custom message" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Custom message</SelectItem>
-                  {posts.map((post) => (
-                    <SelectItem key={post.id} value={post.id}>
-                      {post.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={selectedPost}
+                onChange={(e) => setSelectedPost(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Select a post or write custom message</option>
+                {posts.map((post) => (
+                  <option key={post.id} value={post.id}>
+                    {post.title}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
