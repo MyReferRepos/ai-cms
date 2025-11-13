@@ -12,15 +12,26 @@ interface FacebookPage {
   access_token: string
 }
 
+interface FacebookGroup {
+  id: string
+  name: string
+  description?: string
+  member_count?: number
+  privacy?: string
+}
+
 export default function FacebookCallbackPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pages, setPages] = useState<FacebookPage[]>([])
+  const [groups, setGroups] = useState<FacebookGroup[]>([])
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [connecting, setConnecting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [accessToken, setAccessToken] = useState<string>('')
 
   useEffect(() => {
     handleCallback()
@@ -62,16 +73,26 @@ export default function FacebookCallbackPage() {
         throw new Error('Failed to exchange authorization code')
       }
 
-      const { accessToken } = await tokenResponse.json()
+      const { accessToken: token } = await tokenResponse.json()
+      setAccessToken(token)
 
-      // Get user's pages
-      const pagesResponse = await fetch('/api/facebook/pages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ accessToken }),
-      })
+      // Get user's pages and groups in parallel
+      const [pagesResponse, groupsResponse] = await Promise.all([
+        fetch('/api/facebook/pages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ accessToken: token }),
+        }),
+        fetch('/api/facebook/user-groups', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ accessToken: token }),
+        }),
+      ])
 
       if (!pagesResponse.ok) {
         throw new Error('Failed to fetch Facebook pages')
@@ -79,6 +100,15 @@ export default function FacebookCallbackPage() {
 
       const { pages: fetchedPages } = await pagesResponse.json()
       setPages(fetchedPages)
+
+      // Groups might fail if permissions not granted
+      if (groupsResponse.ok) {
+        const { groups: fetchedGroups } = await groupsResponse.json()
+        setGroups(fetchedGroups)
+      } else {
+        console.warn('Failed to fetch groups - permissions may not be granted')
+      }
+
       setLoading(false)
     } catch (err) {
       console.error('Error in Facebook callback:', err)
@@ -87,9 +117,9 @@ export default function FacebookCallbackPage() {
     }
   }
 
-  const handleConnectPages = async () => {
-    if (selectedPages.size === 0) {
-      setError('Please select at least one page to connect')
+  const handleConnect = async () => {
+    if (selectedPages.size === 0 && selectedGroups.size === 0) {
+      setError('Please select at least one page or group to connect')
       return
     }
 
@@ -120,6 +150,32 @@ export default function FacebookCallbackPage() {
         }
       }
 
+      // Connect each selected group
+      for (const groupId of selectedGroups) {
+        const group = groups.find(g => g.id === groupId)
+        if (!group) continue
+
+        const response = await fetch('/api/facebook/groups', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            groupId: group.id,
+            groupName: group.name,
+            groupDescription: group.description,
+            memberCount: group.member_count,
+            privacy: group.privacy,
+            userAccessToken: accessToken,
+          }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || `Failed to connect ${group.name}`)
+        }
+      }
+
       setSuccess(true)
 
       // Close window after a short delay
@@ -127,8 +183,8 @@ export default function FacebookCallbackPage() {
         window.close()
       }, 2000)
     } catch (err) {
-      console.error('Error connecting pages:', err)
-      setError(err instanceof Error ? err.message : 'Failed to connect pages')
+      console.error('Error connecting:', err)
+      setError(err instanceof Error ? err.message : 'Failed to connect')
     } finally {
       setConnecting(false)
     }
@@ -142,6 +198,16 @@ export default function FacebookCallbackPage() {
       newSelected.add(pageId)
     }
     setSelectedPages(newSelected)
+  }
+
+  const toggleGroup = (groupId: string) => {
+    const newSelected = new Set(selectedGroups)
+    if (newSelected.has(groupId)) {
+      newSelected.delete(groupId)
+    } else {
+      newSelected.add(groupId)
+    }
+    setSelectedGroups(newSelected)
   }
 
   if (loading) {
@@ -200,45 +266,87 @@ export default function FacebookCallbackPage() {
     )
   }
 
+  const totalSelected = selectedPages.size + selectedGroups.size
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Select Facebook Pages</CardTitle>
+          <CardTitle>Select Facebook Pages & Groups</CardTitle>
           <CardDescription>
-            Choose which Facebook pages you want to connect to your CMS
+            Choose which Facebook pages and groups you want to connect to your CMS
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {pages.length === 0 ? (
+        <CardContent className="space-y-6">
+          {pages.length === 0 && groups.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No Facebook pages found. Make sure you have admin access to at least one Facebook page.
+              No Facebook pages or groups found. Make sure you have the required permissions.
             </p>
           ) : (
             <>
-              <div className="space-y-2">
-                {pages.map((page) => (
-                  <label
-                    key={page.id}
-                    className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedPages.has(page.id)}
-                      onChange={() => togglePage(page.id)}
-                      className="rounded"
-                    />
-                    <div>
-                      <p className="font-medium">{page.name}</p>
-                      <p className="text-xs text-muted-foreground">ID: {page.id}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
+              {/* Pages Section */}
+              {pages.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Pages ({pages.length})</h3>
+                  <div className="space-y-2">
+                    {pages.map((page) => (
+                      <label
+                        key={page.id}
+                        className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.has(page.id)}
+                          onChange={() => togglePage(page.id)}
+                          className="rounded"
+                        />
+                        <div>
+                          <p className="font-medium">{page.name}</p>
+                          <p className="text-xs text-muted-foreground">Page ID: {page.id}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Groups Section */}
+              {groups.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Groups ({groups.length})</h3>
+                  <div className="space-y-2">
+                    {groups.map((group) => (
+                      <label
+                        key={group.id}
+                        className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedGroups.has(group.id)}
+                          onChange={() => toggleGroup(group.id)}
+                          className="rounded"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{group.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <span>Group ID: {group.id}</span>
+                            {group.privacy && (
+                              <span className="px-1.5 py-0.5 bg-muted rounded">{group.privacy}</span>
+                            )}
+                            {group.member_count && (
+                              <span>{group.member_count.toLocaleString()} members</span>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <Button
-                onClick={handleConnectPages}
-                disabled={connecting || selectedPages.size === 0}
+                onClick={handleConnect}
+                disabled={connecting || totalSelected === 0}
                 className="w-full"
               >
                 {connecting ? (
@@ -247,7 +355,7 @@ export default function FacebookCallbackPage() {
                     Connecting...
                   </>
                 ) : (
-                  `Connect ${selectedPages.size} Page${selectedPages.size !== 1 ? 's' : ''}`
+                  `Connect ${totalSelected} ${totalSelected === 1 ? 'Item' : 'Items'}`
                 )}
               </Button>
             </>

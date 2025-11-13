@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import FacebookAccountManager from '@/components/admin/facebook-account-manager'
+import FacebookGroupManager from '@/components/admin/facebook-group-manager'
 import FacebookPublisher from '@/components/admin/facebook-publisher'
 import FacebookPostsTable from '@/components/admin/facebook-posts-table'
 
@@ -25,7 +26,7 @@ export default async function FacebookPage() {
           Facebook Management
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Manage your Facebook pages and publish content
+          Manage your Facebook pages, groups and publish content
         </p>
       </div>
 
@@ -39,6 +40,19 @@ export default async function FacebookPage() {
         </CardHeader>
         <CardContent>
           <FacebookAccountManager />
+        </CardContent>
+      </Card>
+
+      {/* Facebook Groups */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Connected Facebook Groups</CardTitle>
+          <CardDescription>
+            Manage your connected Facebook groups and track last post times
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FacebookGroupManager />
         </CardContent>
       </Card>
 

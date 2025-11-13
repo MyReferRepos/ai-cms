@@ -39,6 +39,7 @@ model User {
   media            Media[]
   comments         Comment[]
   facebookAccounts FacebookAccount[]
+  facebookGroups   FacebookGroup[]
 
   @@map("users")
 }
@@ -176,7 +177,8 @@ model FacebookAccount {
 model FacebookPost {
   id                 String             @id @default(cuid())
   postId             String?
-  facebookAccountId  String
+  facebookAccountId  String?
+  facebookGroupId    String?
   facebookPostId     String?            // Facebook's post ID
   status             FacebookPostStatus @default(PENDING)
   message            String
@@ -193,11 +195,38 @@ model FacebookPost {
   updatedAt          DateTime           @updatedAt
 
   post               Post?              @relation(fields: [postId], references: [id], onDelete: SetNull)
-  facebookAccount    FacebookAccount    @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  facebookAccount    FacebookAccount?   @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
+  facebookGroup      FacebookGroup?     @relation(fields: [facebookGroupId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([facebookAccountId])
+  @@index([facebookGroupId])
   @@index([status])
   @@index([facebookPostId])
   @@map("facebook_posts")
+}
+
+model FacebookGroup {
+  id                 String   @id @default(cuid())
+  userId             String
+  groupId            String   @unique
+  groupName          String
+  groupDescription   String?
+  memberCount        Int?
+  privacy            String?  // PUBLIC, CLOSED, SECRET
+  userAccessToken    String   // Encrypted token
+  tokenExpiresAt     DateTime?
+  isActive           Boolean  @default(true)
+  lastPostAt         DateTime? // Last time user posted to this group
+  lastPostCheckedAt  DateTime? // Last time we checked for posts
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facebookPosts      FacebookPost[]
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([lastPostAt])
+  @@map("facebook_groups")
 }

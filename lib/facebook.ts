@@ -29,6 +29,31 @@ export interface PublishToFacebookParams {
   imageUrl?: string
 }
 
+export interface FacebookGroupInfo {
+  id: string
+  name: string
+  description?: string
+  member_count?: number
+  privacy?: string
+}
+
+export interface FacebookGroupPost {
+  id: string
+  message?: string
+  created_time: string
+  from?: {
+    id: string
+    name: string
+  }
+}
+
+export interface PublishToGroupParams {
+  userAccessToken: string
+  groupId: string
+  message: string
+  link?: string
+}
+
 /**
  * Get user's Facebook pages
  */
@@ -257,6 +282,208 @@ export async function verifyPageToken(
     return { isValid: true }
   } catch (error) {
     console.error('Error verifying page token:', error)
+    return { isValid: false }
+  }
+}
+
+// ============================================================================
+// Facebook Groups API
+// ============================================================================
+
+/**
+ * Get user's Facebook groups
+ * Requires: groups_access_member_info permission
+ */
+export async function getUserGroups(userAccessToken: string): Promise<FacebookGroupInfo[]> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me/groups?` +
+      `fields=id,name,description,member_count,privacy&` +
+      `access_token=${userAccessToken}`
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Facebook API error: ${error.error?.message || 'Unknown error'}`)
+    }
+
+    const data = await response.json()
+    return data.data || []
+  } catch (error) {
+    console.error('Error fetching Facebook groups:', error)
+    throw error
+  }
+}
+
+/**
+ * Get group details
+ */
+export async function getGroupDetails(
+  groupId: string,
+  userAccessToken: string
+): Promise<FacebookGroupInfo> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${groupId}?` +
+      `fields=id,name,description,member_count,privacy&` +
+      `access_token=${userAccessToken}`
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Facebook API error: ${error.error?.message || 'Unknown error'}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching group details:', error)
+    throw error
+  }
+}
+
+/**
+ * Publish content to Facebook group
+ * Requires: publish_to_groups permission
+ */
+export async function publishToGroup(
+  params: PublishToGroupParams
+): Promise<FacebookPostResponse> {
+  const { userAccessToken, groupId, message, link } = params
+
+  try {
+    const body: any = {
+      message,
+      access_token: userAccessToken,
+    }
+
+    if (link) {
+      body.link = link
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${groupId}/feed`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Facebook publish error: ${error.error?.message || 'Unknown error'}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error publishing to Facebook group:', error)
+    throw error
+  }
+}
+
+/**
+ * Get user's posts in a specific group
+ * This helps determine the last time user posted to the group
+ */
+export async function getUserGroupPosts(
+  groupId: string,
+  userId: string,
+  userAccessToken: string,
+  limit: number = 10
+): Promise<FacebookGroupPost[]> {
+  try {
+    // Get group feed
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${groupId}/feed?` +
+      `fields=id,message,created_time,from&` +
+      `limit=${limit}&` +
+      `access_token=${userAccessToken}`
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('Facebook group posts error:', error)
+      return []
+    }
+
+    const data = await response.json()
+    const allPosts: FacebookGroupPost[] = data.data || []
+
+    // Filter to only user's posts
+    const userPosts = allPosts.filter(post => post.from?.id === userId)
+
+    return userPosts
+  } catch (error) {
+    console.error('Error fetching user group posts:', error)
+    return []
+  }
+}
+
+/**
+ * Get the last time user posted to a group
+ */
+export async function getLastPostTimeInGroup(
+  groupId: string,
+  userId: string,
+  userAccessToken: string
+): Promise<Date | null> {
+  try {
+    const posts = await getUserGroupPosts(groupId, userId, userAccessToken, 100)
+
+    if (posts.length === 0) {
+      return null
+    }
+
+    // Posts are returned in reverse chronological order, so first one is the latest
+    const latestPost = posts[0]
+    return new Date(latestPost.created_time)
+  } catch (error) {
+    console.error('Error getting last post time:', error)
+    return null
+  }
+}
+
+/**
+ * Verify user access token is valid
+ */
+export async function verifyUserToken(
+  userAccessToken: string
+): Promise<{ isValid: boolean; userId?: string; expiresAt?: Date }> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me?access_token=${userAccessToken}`
+    )
+
+    if (!response.ok) {
+      return { isValid: false }
+    }
+
+    const userData = await response.json()
+
+    // Check token expiration
+    const debugResponse = await fetch(
+      `https://graph.facebook.com/v18.0/debug_token?` +
+      `input_token=${userAccessToken}&` +
+      `access_token=${userAccessToken}`
+    )
+
+    if (debugResponse.ok) {
+      const debugData = await debugResponse.json()
+      const expiresAt = debugData.data?.expires_at
+
+      return {
+        isValid: true,
+        userId: userData.id,
+        expiresAt: expiresAt ? new Date(expiresAt * 1000) : undefined,
+      }
+    }
+
+    return { isValid: true, userId: userData.id }
+  } catch (error) {
+    console.error('Error verifying user token:', error)
     return { isValid: false }
   }
 }
