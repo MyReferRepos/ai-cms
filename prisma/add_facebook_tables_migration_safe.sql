@@ -25,12 +25,14 @@ CREATE TABLE IF NOT EXISTS "facebook_groups" (
     "user_id" TEXT NOT NULL,
     "group_id" TEXT NOT NULL,
     "group_name" TEXT NOT NULL,
-    "privacy" TEXT NOT NULL,
+    "group_description" TEXT,
     "member_count" INTEGER,
+    "privacy" TEXT,
+    "user_access_token" TEXT NOT NULL,
+    "token_expires_at" TIMESTAMP(3),
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
     "last_post_at" TIMESTAMP(3),
     "last_post_checked_at" TIMESTAMP(3),
-    "user_access_token" TEXT NOT NULL,
-    "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -40,16 +42,21 @@ CREATE TABLE IF NOT EXISTS "facebook_groups" (
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "facebook_posts" (
     "id" TEXT NOT NULL,
+    "post_id" TEXT,
     "facebook_account_id" TEXT,
     "facebook_group_id" TEXT,
-    "post_id" TEXT,
+    "facebook_post_id" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
     "message" TEXT NOT NULL,
     "link" TEXT,
     "image_url" TEXT,
-    "likes_count" INTEGER NOT NULL DEFAULT 0,
-    "shares_count" INTEGER NOT NULL DEFAULT 0,
-    "comments_count" INTEGER NOT NULL DEFAULT 0,
-    "published_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "published_at" TIMESTAMP(3),
+    "scheduled_at" TIMESTAMP(3),
+    "likes_count" INTEGER,
+    "shares_count" INTEGER,
+    "comments_count" INTEGER,
+    "reach" INTEGER,
+    "error_message" TEXT,
     "user_id" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -85,6 +92,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS "facebook_groups_group_id_key" ON "facebook_gr
 CREATE INDEX IF NOT EXISTS "facebook_groups_user_id_idx" ON "facebook_groups"("user_id");
 
 -- CreateIndex
+CREATE INDEX IF NOT EXISTS "facebook_groups_last_post_at_idx" ON "facebook_groups"("last_post_at");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "facebook_posts_post_id_idx" ON "facebook_posts"("post_id");
+
+-- CreateIndex
 CREATE INDEX IF NOT EXISTS "facebook_posts_facebook_account_id_idx" ON "facebook_posts"("facebook_account_id");
 
 -- CreateIndex
@@ -94,10 +107,19 @@ CREATE INDEX IF NOT EXISTS "facebook_posts_facebook_group_id_idx" ON "facebook_p
 CREATE INDEX IF NOT EXISTS "facebook_posts_user_id_idx" ON "facebook_posts"("user_id");
 
 -- CreateIndex
+CREATE INDEX IF NOT EXISTS "facebook_posts_status_idx" ON "facebook_posts"("status");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "facebook_posts_facebook_post_id_idx" ON "facebook_posts"("facebook_post_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "facebook_best_times_facebook_account_id_day_of_week_hour_key" ON "facebook_best_times"("facebook_account_id", "day_of_week", "hour");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "facebook_best_times_facebook_account_id_idx" ON "facebook_best_times"("facebook_account_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "facebook_best_times_score_idx" ON "facebook_best_times"("score");
 
 -- AddForeignKey (with error handling)
 DO $$
@@ -117,6 +139,14 @@ BEGIN
     ) THEN
         ALTER TABLE "facebook_groups" ADD CONSTRAINT "facebook_groups_user_id_fkey"
         FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'facebook_posts_post_id_fkey'
+    ) THEN
+        ALTER TABLE "facebook_posts" ADD CONSTRAINT "facebook_posts_post_id_fkey"
+        FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
     END IF;
 
     IF NOT EXISTS (
