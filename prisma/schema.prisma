@@ -40,6 +40,7 @@ model User {
   comments         Comment[]
   facebookAccounts FacebookAccount[]
   facebookGroups   FacebookGroup[]
+  facebookPosts    FacebookPost[]
 
   @@map("users")
 }
@@ -157,14 +158,14 @@ enum FacebookPostStatus {
 
 model FacebookAccount {
   id              String   @id @default(cuid())
-  userId          String
-  pageId          String   @unique
-  pageName        String
-  pageAccessToken String   // Encrypted token
-  tokenExpiresAt  DateTime?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  userId          String   @map("user_id")
+  pageId          String   @unique @map("page_id")
+  pageName        String   @map("page_name")
+  pageAccessToken String   @map("page_access_token")  // Encrypted token
+  tokenExpiresAt  DateTime? @map("token_expires_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   facebookPosts   FacebookPost[]
@@ -177,31 +178,34 @@ model FacebookAccount {
 
 model FacebookPost {
   id                 String             @id @default(cuid())
-  postId             String?
-  facebookAccountId  String?
-  facebookGroupId    String?
-  facebookPostId     String?            // Facebook's post ID
+  postId             String?            @map("post_id")
+  facebookAccountId  String?            @map("facebook_account_id")
+  facebookGroupId    String?            @map("facebook_group_id")
+  facebookPostId     String?            @map("facebook_post_id")  // Facebook's post ID
   status             FacebookPostStatus @default(PENDING)
   message            String
   link               String?
-  imageUrl           String?
-  publishedAt        DateTime?
-  scheduledAt        DateTime?
-  likes              Int?
-  shares             Int?
-  comments           Int?
+  imageUrl           String?            @map("image_url")
+  publishedAt        DateTime?          @map("published_at")
+  scheduledAt        DateTime?          @map("scheduled_at")
+  likes              Int?               @map("likes_count")
+  shares             Int?               @map("shares_count")
+  comments           Int?               @map("comments_count")
   reach              Int?
-  errorMessage       String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  errorMessage       String?            @map("error_message")
+  userId             String             @map("user_id")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
 
   post               Post?              @relation(fields: [postId], references: [id], onDelete: SetNull)
   facebookAccount    FacebookAccount?   @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
   facebookGroup      FacebookGroup?     @relation(fields: [facebookGroupId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([facebookAccountId])
   @@index([facebookGroupId])
+  @@index([userId])
   @@index([status])
   @@index([facebookPostId])
   @@map("facebook_posts")
@@ -209,19 +213,19 @@ model FacebookPost {
 
 model FacebookGroup {
   id                 String   @id @default(cuid())
-  userId             String
-  groupId            String   @unique
-  groupName          String
-  groupDescription   String?
-  memberCount        Int?
+  userId             String   @map("user_id")
+  groupId            String   @unique @map("group_id")
+  groupName          String   @map("group_name")
+  groupDescription   String?  @map("group_description")
+  memberCount        Int?     @map("member_count")
   privacy            String?  // PUBLIC, CLOSED, SECRET
-  userAccessToken    String   // Encrypted token
-  tokenExpiresAt     DateTime?
-  isActive           Boolean  @default(true)
-  lastPostAt         DateTime? // Last time user posted to this group
-  lastPostCheckedAt  DateTime? // Last time we checked for posts
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  userAccessToken    String   @map("user_access_token")  // Encrypted token
+  tokenExpiresAt     DateTime? @map("token_expires_at")
+  isActive           Boolean  @default(true) @map("is_active")
+  lastPostAt         DateTime? @map("last_post_at")  // Last time user posted to this group
+  lastPostCheckedAt  DateTime? @map("last_post_checked_at")  // Last time we checked for posts
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   facebookPosts      FacebookPost[]
@@ -234,16 +238,16 @@ model FacebookGroup {
 
 model FacebookBestTime {
   id                String   @id @default(cuid())
-  facebookAccountId String
-  dayOfWeek         Int      // 0-6 (Sunday to Saturday)
+  facebookAccountId String   @map("facebook_account_id")
+  dayOfWeek         Int      @map("day_of_week")  // 0-6 (Sunday to Saturday)
   hour              Int      // 0-23
   score             Float    // Engagement score (0-100)
-  avgEngagement     Float    // Average engagement rate
-  avgReach          Int      // Average reach
-  sampleSize        Int      // Number of posts analyzed
-  lastAnalyzedAt    DateTime
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  avgEngagement     Float    @map("avg_engagement")  // Average engagement rate
+  avgReach          Int      @map("avg_reach")  // Average reach
+  sampleSize        Int      @map("sample_size")  // Number of posts analyzed
+  lastAnalyzedAt    DateTime @map("last_analyzed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   facebookAccount   FacebookAccount @relation(fields: [facebookAccountId], references: [id], onDelete: Cascade)
 
