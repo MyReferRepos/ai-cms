@@ -25,14 +25,19 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Basic permissions for development mode
-  // Note: Advanced permissions (pages_manage_posts, read_insights, etc.)
-  // require app review and business verification
+  // Full permissions (will show warning for regular users in development mode)
+  // SOLUTION: Use Facebook Test Users to bypass permission restrictions
+  // Create test users at: Facebook App Dashboard → Roles → Test Users
   const scope = [
-    'email',                        // User email
-    'public_profile',               // User public profile
-    'pages_show_list',              // View list of pages (Basic permission)
-    'pages_read_user_content',      // Read user content on pages (replaces pages_read_engagement)
+    'email',
+    'public_profile',
+    'pages_show_list',
+    'pages_read_user_content',
+    'pages_manage_posts',        // Publishing posts (requires test user or app review)
+    'pages_manage_engagement',   // Managing comments (requires test user or app review)
+    'read_insights',             // Analytics data (requires test user or app review)
+    'groups_access_member_info', // Group info (requires test user or app review)
+    'publish_to_groups',         // Publish to groups (requires test user or app review)
   ].join(',')
 
   const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
