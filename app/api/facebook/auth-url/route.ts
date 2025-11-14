@@ -25,15 +25,14 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Required permissions for managing pages, groups and publishing
+  // Basic permissions for development mode
+  // Note: Advanced permissions (pages_manage_posts, read_insights, etc.)
+  // require app review and business verification
   const scope = [
-    'pages_show_list',              // View list of pages
-    'pages_read_engagement',        // Read page engagement data
-    'pages_manage_posts',           // Create, edit and delete posts
-    'pages_manage_engagement',      // Manage comments, reactions
-    'read_insights',                // Read page insights for analytics
-    'groups_access_member_info',    // Access group member info
-    'publish_to_groups',            // Publish to groups
+    'email',                        // User email
+    'public_profile',               // User public profile
+    'pages_show_list',              // View list of pages (Basic permission)
+    'pages_read_user_content',      // Read user content on pages (replaces pages_read_engagement)
   ].join(',')
 
   const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
