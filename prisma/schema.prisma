@@ -138,11 +138,16 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // For registered users
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // For anonymous users (guest comments)
+  guestName  String?
+  guestEmail String?
+
   postId    String
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([authorId])

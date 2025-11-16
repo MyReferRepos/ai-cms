@@ -101,9 +101,14 @@ CREATE TABLE IF NOT EXISTS "comments" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "postId" TEXT NOT NULL,
-    "authorId" TEXT NOT NULL,
+    "authorId" TEXT,
+    "guestName" TEXT,
+    "guestEmail" TEXT,
 
-    CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "comments_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "comments_author_or_guest_check" CHECK (
+        ("authorId" IS NOT NULL) OR ("guestName" IS NOT NULL)
+    )
 );
 
 -- CreateIndex

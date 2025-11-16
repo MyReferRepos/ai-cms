@@ -9,11 +9,14 @@ import {
 } from '@/lib/anti-spam';
 
 /**
- * 评论创建请求的验证 schema
+ * 评论创建请求的验证 schema（支持匿名评论）
  */
 const createCommentSchema = z.object({
   postId: z.string().min(1, 'Post ID is required'),
   content: z.string().min(2, 'Comment must be at least 2 characters').max(5000, 'Comment is too long'),
+  // For anonymous users
+  guestName: z.string().optional(),
+  guestEmail: z.string().email().optional().or(z.literal('')),
   // 反垃圾字段
   honeypot: z.string().optional(), // 应该为空
   timestamp: z.number().optional(), // 表单生成时间
@@ -21,18 +24,13 @@ const createCommentSchema = z.object({
 
 /**
  * POST /api/comments
- * 创建新评论（带反垃圾保护）
+ * 创建新评论（支持匿名评论+反垃圾保护）
  */
 export async function POST(request: NextRequest) {
   try {
-    // 检查用户认证
+    // 检查用户认证状态
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please login to comment' },
-        { status: 401 }
-      );
-    }
+    const isAnonymous = !session?.user?.id;
 
     // 解析请求体
     const body = await request.json();
@@ -49,17 +47,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { postId, content, honeypot, timestamp } = validationResult.data;
+    const { postId, content, guestName, guestEmail, honeypot, timestamp } = validationResult.data;
 
     // ===== 反垃圾检查 =====
     const clientIP = getClientIP(request);
-    const identifier = `${clientIP}:${session.user.id}`;
+    const identifier = isAnonymous
+      ? `anon:${clientIP}`
+      : `${clientIP}:${session.user.id}`;
 
     const antiSpamResult = performAntiSpamCheck({
       identifier,
       content,
       honeypot,
       timestamp,
+      isAnonymous,
+      guestName,
+      guestEmail,
     });
 
     if (!antiSpamResult.passed) {
@@ -105,36 +108,53 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== 创建评论 =====
-    // 默认情况下，评论需要审核（approved: false）
-    // 管理员的评论可以自动批准
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
+    let autoApprove = false;
 
-    const autoApprove = user?.role === 'ADMIN';
+    // 检查是否自动批准
+    if (!isAnonymous) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true },
+      });
+      autoApprove = user?.role === 'ADMIN';
+    }
+    // 匿名评论始终需要审核
+
+    // 准备评论数据
+    const commentData: any = {
+      content,
+      postId,
+      approved: autoApprove,
+    };
+
+    if (isAnonymous) {
+      // 匿名评论
+      commentData.guestName = guestName;
+      commentData.guestEmail = guestEmail || null;
+    } else {
+      // 已登录用户评论
+      commentData.authorId = session.user.id;
+    }
 
     const comment = await prisma.comment.create({
-      data: {
-        content,
-        postId,
-        authorId: session.user.id,
-        approved: autoApprove,
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+      data: commentData,
+      include: isAnonymous
+        ? undefined
+        : {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+              },
+            },
           },
-        },
-      },
     });
 
     console.info(
-      `[Comment] New comment created by ${session.user.email} on post ${postId}` +
+      `[Comment] New ${isAnonymous ? 'anonymous' : 'registered'} comment created` +
+        ` on post ${postId}` +
         (autoApprove ? ' (auto-approved)' : ' (pending approval)')
     );
 
@@ -143,7 +163,7 @@ export async function POST(request: NextRequest) {
         comment,
         message: autoApprove
           ? 'Comment published successfully'
-          : 'Comment submitted and pending approval',
+          : 'Comment submitted and pending approval. Thank you!',
       },
       { status: 201 }
     );
@@ -224,8 +244,15 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // 处理评论数据，统一格式（包含匿名和注册用户）
+    const processedComments = comments.map((comment) => ({
+      ...comment,
+      displayName: comment.author?.name || comment.guestName || 'Anonymous',
+      displayImage: comment.author?.image || null,
+    }));
+
     return NextResponse.json({
-      comments,
+      comments: processedComments,
       total: comments.length,
     });
   } catch (error) {
