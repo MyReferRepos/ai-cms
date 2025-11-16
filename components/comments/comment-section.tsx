@@ -26,6 +26,225 @@ interface CommentSectionProps {
   initialComments?: Comment[];
 }
 
+interface CommentItemProps {
+  comment: Comment;
+  depth?: number;
+  replyingTo: string | null;
+  setReplyingTo: (id: string | null) => void;
+  replyContent: string;
+  setReplyContent: (content: string) => void;
+  guestName: string;
+  setGuestName: (name: string) => void;
+  guestEmail: string;
+  setGuestEmail: (email: string) => void;
+  isAnonymous: boolean;
+  isSubmitting: boolean;
+  handleSubmit: (e: React.FormEvent, parentId?: string) => void;
+}
+
+// 提取 CommentItem 到组件外部，避免每次渲染时重新创建
+function CommentItem({
+  comment,
+  depth = 0,
+  replyingTo,
+  setReplyingTo,
+  replyContent,
+  setReplyContent,
+  guestName,
+  setGuestName,
+  guestEmail,
+  setGuestEmail,
+  isAnonymous,
+  isSubmitting,
+  handleSubmit,
+}: CommentItemProps) {
+  const getDisplayName = (comment: Comment) => {
+    if (comment.displayName) return comment.displayName;
+    if (comment.author?.name) return comment.author.name;
+    if (comment.guestName) return comment.guestName;
+    return 'Anonymous';
+  };
+
+  const getDisplayImage = (comment: Comment) => {
+    if (comment.displayImage) return comment.displayImage;
+    if (comment.author?.image) return comment.author.image;
+    return null;
+  };
+
+  const displayName = getDisplayName(comment);
+  const displayImage = getDisplayImage(comment);
+  const isReplyingToThis = replyingTo === comment.id;
+  const maxDepth = 3; // 最大嵌套深度
+
+  return (
+    <div className={depth > 0 ? 'ml-8 mt-4' : ''}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-start space-x-4">
+          {/* 用户头像 */}
+          <div className="flex-shrink-0">
+            {displayImage ? (
+              <img
+                src={displayImage}
+                alt={displayName}
+                className="w-10 h-10 rounded-full"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                <span className="text-gray-600 dark:text-gray-300 font-medium">
+                  {displayName[0].toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* 评论内容 */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                  {displayName}
+                </h4>
+                {comment.guestName && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    (Guest)
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {formatDate(comment.createdAt)}
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              {comment.content}
+            </p>
+
+            {/* 回复按钮 */}
+            {depth < maxDepth && (
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    if (isReplyingToThis) {
+                      setReplyingTo(null);
+                      setReplyContent('');
+                    } else {
+                      setReplyingTo(comment.id);
+                      setReplyContent('');
+                    }
+                  }}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                >
+                  {isReplyingToThis ? 'Cancel' : 'Reply'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 回复表单 */}
+      {isReplyingToThis && (
+        <div className="ml-8 mt-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+          <form onSubmit={(e) => handleSubmit(e, comment.id)} className="space-y-3">
+            {/* 匿名用户需要填写姓名和邮箱 */}
+            {isAnonymous && (
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                    placeholder="Your name"
+                    maxLength={50}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                    placeholder="your@email.com"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Reply to {displayName}
+              </label>
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                placeholder="Write your reply..."
+                maxLength={5000}
+                disabled={isSubmitting}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {replyContent.length} / 5000 characters
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setReplyingTo(null);
+                  setReplyContent('');
+                }}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting...' : 'Submit Reply'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 递归渲染回复 */}
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="mt-4 space-y-4">
+          {comment.replies.map((reply) => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              depth={depth + 1}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              replyContent={replyContent}
+              setReplyContent={setReplyContent}
+              guestName={guestName}
+              setGuestName={setGuestName}
+              guestEmail={guestEmail}
+              setGuestEmail={setGuestEmail}
+              isAnonymous={isAnonymous}
+              isSubmitting={isSubmitting}
+              handleSubmit={handleSubmit}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CommentSection({
   postId,
   initialComments = [],
@@ -150,180 +369,6 @@ export default function CommentSection({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getDisplayName = (comment: Comment) => {
-    if (comment.displayName) return comment.displayName;
-    if (comment.author?.name) return comment.author.name;
-    if (comment.guestName) return comment.guestName;
-    return 'Anonymous';
-  };
-
-  const getDisplayImage = (comment: Comment) => {
-    if (comment.displayImage) return comment.displayImage;
-    if (comment.author?.image) return comment.author.image;
-    return null;
-  };
-
-  // 递归渲染评论（支持嵌套回复）
-  const CommentItem = ({ comment, depth = 0 }: { comment: Comment; depth?: number }) => {
-    const displayName = getDisplayName(comment);
-    const displayImage = getDisplayImage(comment);
-    const isReplyingToThis = replyingTo === comment.id;
-    const maxDepth = 3; // 最大嵌套深度
-
-    return (
-      <div className={depth > 0 ? 'ml-8 mt-4' : ''}>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-start space-x-4">
-            {/* 用户头像 */}
-            <div className="flex-shrink-0">
-              {displayImage ? (
-                <img
-                  src={displayImage}
-                  alt={displayName}
-                  className="w-10 h-10 rounded-full"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                  <span className="text-gray-600 dark:text-gray-300 font-medium">
-                    {displayName[0].toUpperCase()}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* 评论内容 */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                    {displayName}
-                  </h4>
-                  {comment.guestName && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      (Guest)
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatDate(comment.createdAt)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {comment.content}
-              </p>
-
-              {/* 回复按钮 */}
-              {depth < maxDepth && (
-                <div className="mt-3">
-                  <button
-                    onClick={() => {
-                      if (isReplyingToThis) {
-                        setReplyingTo(null);
-                        setReplyContent('');
-                      } else {
-                        setReplyingTo(comment.id);
-                        setReplyContent('');
-                      }
-                    }}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                  >
-                    {isReplyingToThis ? 'Cancel' : 'Reply'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 回复表单 */}
-        {isReplyingToThis && (
-          <div className="ml-8 mt-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-            <form onSubmit={(e) => handleSubmit(e, comment.id)} className="space-y-3">
-              {/* 匿名用户需要填写姓名和邮箱 */}
-              {isAnonymous && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={guestName}
-                      onChange={(e) => setGuestName(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
-                      placeholder="Your name"
-                      maxLength={50}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Email (optional)
-                    </label>
-                    <input
-                      type="email"
-                      value={guestEmail}
-                      onChange={(e) => setGuestEmail(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
-                      placeholder="your@email.com"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Reply to {displayName}
-                </label>
-                <textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
-                  placeholder="Write your reply..."
-                  maxLength={5000}
-                  disabled={isSubmitting}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {replyContent.length} / 5000 characters
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setReplyingTo(null);
-                    setReplyContent('');
-                  }}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Reply'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* 递归渲染回复 */}
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="mt-4 space-y-4">
-            {comment.replies.map((reply) => (
-              <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -454,7 +499,22 @@ export default function CommentSection({
           </p>
         ) : (
           comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} depth={0} />
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              depth={0}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              replyContent={replyContent}
+              setReplyContent={setReplyContent}
+              guestName={guestName}
+              setGuestName={setGuestName}
+              guestEmail={guestEmail}
+              setGuestEmail={setGuestEmail}
+              isAnonymous={isAnonymous}
+              isSubmitting={isSubmitting}
+              handleSubmit={handleSubmit}
+            />
           ))
         )}
       </div>
