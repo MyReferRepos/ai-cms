@@ -32,7 +32,8 @@ export default function CommentSection({
 }: CommentSectionProps) {
   const { data: session } = useSession();
   const [comments, setComments] = useState<Comment[]>(initialComments);
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(''); // 主评论内容
+  const [replyContent, setReplyContent] = useState(''); // 回复内容
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [honeypot, setHoneypot] = useState(''); // 反垃圾字段
@@ -66,8 +67,11 @@ export default function CommentSection({
     setError(null);
     setSuccessMessage(null);
 
+    // 根据是主评论还是回复，使用不同的 content
+    const commentContent = parentId ? replyContent : content;
+
     // 验证表单
-    if (!content.trim()) {
+    if (!commentContent.trim()) {
       setError('Comment cannot be empty');
       return;
     }
@@ -82,7 +86,7 @@ export default function CommentSection({
     try {
       const requestBody: any = {
         postId,
-        content: content.trim(),
+        content: commentContent.trim(),
         honeypot, // 应该为空
         timestamp, // 表单生成时间
       };
@@ -109,7 +113,12 @@ export default function CommentSection({
       const data = await response.json();
 
       if (response.ok) {
-        setContent('');
+        // 清除对应的内容
+        if (parentId) {
+          setReplyContent('');
+        } else {
+          setContent('');
+        }
         setReplyingTo(null); // 清除回复状态
         if (isAnonymous) {
           // 匿名用户保留姓名和邮箱以便下次使用
@@ -209,7 +218,15 @@ export default function CommentSection({
               {depth < maxDepth && (
                 <div className="mt-3">
                   <button
-                    onClick={() => setReplyingTo(isReplyingToThis ? null : comment.id)}
+                    onClick={() => {
+                      if (isReplyingToThis) {
+                        setReplyingTo(null);
+                        setReplyContent('');
+                      } else {
+                        setReplyingTo(comment.id);
+                        setReplyContent('');
+                      }
+                    }}
                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
                   >
                     {isReplyingToThis ? 'Cancel' : 'Reply'}
@@ -263,8 +280,8 @@ export default function CommentSection({
                   Reply to {displayName}
                 </label>
                 <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
                   placeholder="Write your reply..."
@@ -272,7 +289,7 @@ export default function CommentSection({
                   disabled={isSubmitting}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {content.length} / 5000 characters
+                  {replyContent.length} / 5000 characters
                 </p>
               </div>
 
@@ -281,7 +298,10 @@ export default function CommentSection({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setReplyingTo(null)}
+                  onClick={() => {
+                    setReplyingTo(null);
+                    setReplyContent('');
+                  }}
                   disabled={isSubmitting}
                 >
                   Cancel
