@@ -31,7 +31,7 @@ export default async function CommentsPage({
   }
 
   // 构建查询条件
-  const status = searchParams.status || 'pending';
+  const status = searchParams.status || 'all';
   const where: any = {};
 
   if (status === 'pending') {
