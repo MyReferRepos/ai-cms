@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
+import PostCommentsDialog from '@/components/admin/post-comments-dialog'
 
 interface Post {
   id: string
@@ -35,6 +36,8 @@ interface PostsTableProps {
 export default function PostsTable({ posts, currentUserId, userRole }: PostsTableProps) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [commentsDialogOpen, setCommentsDialogOpen] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<{ id: string; title: string } | null>(null)
 
   const handleDelete = async (postId: string) => {
     if (!confirm('Are you sure you want to delete this post?')) return
@@ -63,6 +66,11 @@ export default function PostsTable({ posts, currentUserId, userRole }: PostsTabl
 
   const canDelete = (post: Post) => {
     return userRole === 'ADMIN' || post.author.id === currentUserId
+  }
+
+  const handleViewComments = (post: Post) => {
+    setSelectedPost({ id: post.id, title: post.title })
+    setCommentsDialogOpen(true)
   }
 
   if (posts.length === 0) {
@@ -97,9 +105,16 @@ export default function PostsTable({ posts, currentUserId, userRole }: PostsTabl
                   >
                     {post.title}
                   </Link>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {post._count.comments} comments · {post._count.tags} tags
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      onClick={() => handleViewComments(post)}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      {post._count.comments} comments
+                    </button>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs text-muted-foreground">{post._count.tags} tags</span>
+                  </div>
                 </div>
               </td>
               <td className="py-4 text-sm">
@@ -155,6 +170,16 @@ export default function PostsTable({ posts, currentUserId, userRole }: PostsTabl
           ))}
         </tbody>
       </table>
+
+      {/* 评论弹窗 */}
+      {selectedPost && (
+        <PostCommentsDialog
+          postId={selectedPost.id}
+          postTitle={selectedPost.title}
+          open={commentsDialogOpen}
+          onClose={() => setCommentsDialogOpen(false)}
+        />
+      )}
     </div>
   )
 }
