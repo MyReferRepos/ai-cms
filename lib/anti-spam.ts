@@ -1,6 +1,7 @@
 /**
  * 反垃圾评论工具库
  * 提供多层防护机制，防止表单攻击和垃圾评论
+ * 支持已登录用户和匿名用户（匿名用户限制更严格）
  */
 
 interface RateLimitEntry {
@@ -17,14 +18,31 @@ const ipBlockList = new Set<string>();
  * 速率限制配置
  */
 export const RATE_LIMIT_CONFIG = {
-  // 时间窗口（毫秒）
-  WINDOW_MS: 60 * 1000, // 1分钟
-  // 允许的最大请求数
-  MAX_REQUESTS: 3,
-  // 严格模式窗口（更短时间内的限制）
-  STRICT_WINDOW_MS: 10 * 1000, // 10秒
-  // 严格模式下的最大请求数
-  STRICT_MAX_REQUESTS: 1,
+  // 已登录用户配置
+  LOGGED_IN: {
+    // 时间窗口（毫秒）
+    WINDOW_MS: 60 * 1000, // 1分钟
+    // 允许的最大请求数
+    MAX_REQUESTS: 3,
+    // 严格模式窗口（更短时间内的限制）
+    STRICT_WINDOW_MS: 10 * 1000, // 10秒
+    // 严格模式下的最大请求数
+    STRICT_MAX_REQUESTS: 1,
+  },
+
+  // 匿名用户配置（更严格）
+  ANONYMOUS: {
+    // 时间窗口（毫秒）
+    WINDOW_MS: 60 * 1000, // 1分钟
+    // 允许的最大请求数
+    MAX_REQUESTS: 1, // 匿名用户1分钟只能1条
+    // 严格模式窗口
+    STRICT_WINDOW_MS: 30 * 1000, // 30秒
+    // 严格模式下的最大请求数
+    STRICT_MAX_REQUESTS: 1,
+  },
+
+  // 通用配置
   // IP封禁时间
   BLOCK_DURATION_MS: 60 * 60 * 1000, // 1小时
   // 触发封禁的违规次数
@@ -38,7 +56,11 @@ function cleanupExpiredEntries() {
   const now = Date.now();
   const entries = Array.from(rateLimitStore.entries());
   for (const [key, entry] of entries) {
-    if (now - entry.lastRequest > RATE_LIMIT_CONFIG.WINDOW_MS * 2) {
+    const maxWindow = Math.max(
+      RATE_LIMIT_CONFIG.LOGGED_IN.WINDOW_MS,
+      RATE_LIMIT_CONFIG.ANONYMOUS.WINDOW_MS
+    );
+    if (now - entry.lastRequest > maxWindow * 2) {
       rateLimitStore.delete(key);
     }
   }
@@ -50,9 +72,13 @@ setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
 /**
  * 检查速率限制
  * @param identifier - 标识符（IP地址或用户ID）
+ * @param isAnonymous - 是否为匿名用户
  * @returns 是否被限制
  */
-export function checkRateLimit(identifier: string): {
+export function checkRateLimit(
+  identifier: string,
+  isAnonymous: boolean = false
+): {
   allowed: boolean;
   retryAfter?: number;
   reason?: string;
@@ -64,6 +90,11 @@ export function checkRateLimit(identifier: string): {
       reason: 'IP blocked due to excessive violations',
     };
   }
+
+  // 根据用户类型选择配置
+  const config = isAnonymous
+    ? RATE_LIMIT_CONFIG.ANONYMOUS
+    : RATE_LIMIT_CONFIG.LOGGED_IN;
 
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
@@ -78,26 +109,26 @@ export function checkRateLimit(identifier: string): {
     return { allowed: true };
   }
 
-  // 检查严格模式（10秒内多次请求）
-  if (now - entry.lastRequest < RATE_LIMIT_CONFIG.STRICT_WINDOW_MS) {
-    if (entry.count >= RATE_LIMIT_CONFIG.STRICT_MAX_REQUESTS) {
+  // 检查严格模式（短时间内多次请求）
+  if (now - entry.lastRequest < config.STRICT_WINDOW_MS) {
+    if (entry.count >= config.STRICT_MAX_REQUESTS) {
       return {
         allowed: false,
         retryAfter: Math.ceil(
-          (RATE_LIMIT_CONFIG.STRICT_WINDOW_MS - (now - entry.lastRequest)) / 1000
+          (config.STRICT_WINDOW_MS - (now - entry.lastRequest)) / 1000
         ),
         reason: 'Too many requests in a short time',
       };
     }
   }
 
-  // 检查常规速率限制（1分钟内的请求数）
-  if (now - entry.firstRequest < RATE_LIMIT_CONFIG.WINDOW_MS) {
-    if (entry.count >= RATE_LIMIT_CONFIG.MAX_REQUESTS) {
+  // 检查常规速率限制（时间窗口内的请求数）
+  if (now - entry.firstRequest < config.WINDOW_MS) {
+    if (entry.count >= config.MAX_REQUESTS) {
       return {
         allowed: false,
         retryAfter: Math.ceil(
-          (RATE_LIMIT_CONFIG.WINDOW_MS - (now - entry.firstRequest)) / 1000
+          (config.WINDOW_MS - (now - entry.firstRequest)) / 1000
         ),
         reason: 'Rate limit exceeded',
       };
@@ -163,17 +194,24 @@ export function validateHoneypot(honeypotValue: any): boolean {
 /**
  * 验证时间戳（防止表单重放攻击）
  * @param timestamp - 表单生成时的时间戳
+ * @param isAnonymous - 是否为匿名用户
  * @returns 验证结果
  */
-export function validateTimestamp(timestamp: number): {
+export function validateTimestamp(
+  timestamp: number,
+  isAnonymous: boolean = false
+): {
   valid: boolean;
   reason?: string;
 } {
   const now = Date.now();
   const age = now - timestamp;
 
-  // 表单提交太快（少于3秒）- 可能是机器人
-  if (age < 3000) {
+  // 匿名用户需要等待更长时间（至少5秒），已登录用户3秒
+  const minAge = isAnonymous ? 5000 : 3000;
+
+  // 表单提交太快 - 可能是机器人
+  if (age < minAge) {
     return {
       valid: false,
       reason: 'Form submitted too quickly',
@@ -189,6 +227,16 @@ export function validateTimestamp(timestamp: number): {
   }
 
   return { valid: true };
+}
+
+/**
+ * 验证邮箱格式
+ * @param email - 邮箱地址
+ * @returns 是否有效
+ */
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 }
 
 /**
@@ -308,12 +356,23 @@ export function performAntiSpamCheck(params: {
   content: string;
   honeypot?: any;
   timestamp?: number;
+  isAnonymous?: boolean;
+  guestName?: string;
+  guestEmail?: string;
 }): {
   passed: boolean;
   reason?: string;
   retryAfter?: number;
 } {
-  const { identifier, content, honeypot, timestamp } = params;
+  const {
+    identifier,
+    content,
+    honeypot,
+    timestamp,
+    isAnonymous = false,
+    guestName,
+    guestEmail,
+  } = params;
 
   // 1. Honeypot 检查
   if (honeypot !== undefined && !validateHoneypot(honeypot)) {
@@ -324,9 +383,35 @@ export function performAntiSpamCheck(params: {
     };
   }
 
-  // 2. 时间戳检查
+  // 2. 匿名评论额外验证
+  if (isAnonymous) {
+    // 验证昵称
+    if (!guestName || guestName.trim().length < 2) {
+      return {
+        passed: false,
+        reason: 'Guest name is required and must be at least 2 characters',
+      };
+    }
+
+    if (guestName.length > 50) {
+      return {
+        passed: false,
+        reason: 'Guest name is too long',
+      };
+    }
+
+    // 如果提供了邮箱，验证格式
+    if (guestEmail && !validateEmail(guestEmail)) {
+      return {
+        passed: false,
+        reason: 'Invalid email format',
+      };
+    }
+  }
+
+  // 3. 时间戳检查
   if (timestamp) {
-    const tsValidation = validateTimestamp(timestamp);
+    const tsValidation = validateTimestamp(timestamp, isAnonymous);
     if (!tsValidation.valid) {
       recordViolation(identifier);
       return {
@@ -336,8 +421,8 @@ export function performAntiSpamCheck(params: {
     }
   }
 
-  // 3. 速率限制检查
-  const rateLimitResult = checkRateLimit(identifier);
+  // 4. 速率限制检查
+  const rateLimitResult = checkRateLimit(identifier, isAnonymous);
   if (!rateLimitResult.allowed) {
     return {
       passed: false,
@@ -346,7 +431,7 @@ export function performAntiSpamCheck(params: {
     };
   }
 
-  // 4. 内容验证
+  // 5. 内容验证
   const contentValidation = validateCommentContent(content);
   if (!contentValidation.valid) {
     recordViolation(identifier);

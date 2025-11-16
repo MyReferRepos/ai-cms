@@ -11,12 +11,14 @@ interface Comment {
   content: string;
   approved: boolean;
   createdAt: Date;
-  author: {
+  author?: {
     id: string;
     name: string | null;
     email: string;
     image: string | null;
-  };
+  } | null;
+  guestName?: string | null;
+  guestEmail?: string | null;
   post: {
     id: string;
     title: string;
@@ -165,7 +167,7 @@ export default function CommentsTable({
                 {/* 作者和状态 */}
                 <div className="flex items-center space-x-3 mb-2">
                   <div className="flex items-center space-x-2">
-                    {comment.author.image && (
+                    {comment.author?.image && (
                       <img
                         src={comment.author.image}
                         alt={comment.author.name || ''}
@@ -174,10 +176,16 @@ export default function CommentsTable({
                     )}
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {comment.author.name || comment.author.email}
+                        {comment.author?.name || comment.author?.email || comment.guestName || 'Anonymous'}
+                        {comment.guestName && (
+                          <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                            (Guest)
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDate(comment.createdAt)}
+                        {comment.guestEmail && ` • ${comment.guestEmail}`}
                       </p>
                     </div>
                   </div>
