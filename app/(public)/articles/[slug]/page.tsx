@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import PublicLayout from '@/components/public/public-layout'
 import MarkdownRenderer from '@/components/public/markdown-renderer'
+import CommentSection from '@/components/comments/comment-section'
 import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import ArticleCard from '@/components/public/article-card'
@@ -25,6 +26,23 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       tags: {
         include: {
           tag: true,
+        },
+      },
+      comments: {
+        where: {
+          approved: true,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
       },
     },
@@ -153,6 +171,11 @@ export default async function ArticlePage({ params }: { params: { slug: string }
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Comments Section */}
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <CommentSection postId={post.id} initialComments={post.comments} />
         </div>
 
         {/* Related Posts */}
