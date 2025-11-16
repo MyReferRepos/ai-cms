@@ -20,6 +20,7 @@ export default function AdminNav({ user }: AdminNavProps) {
   const navItems = [
     { href: '/admin', label: 'Dashboard', roles: ['ADMIN', 'EDITOR', 'AUTHOR', 'VIEWER'] },
     { href: '/admin/posts', label: 'Posts', roles: ['ADMIN', 'EDITOR', 'AUTHOR'] },
+    { href: '/admin/comments', label: 'Comments', roles: ['ADMIN', 'EDITOR'] },
     { href: '/admin/users', label: 'Users', roles: ['ADMIN'] },
     { href: '/admin/categories', label: 'Categories', roles: ['ADMIN', 'EDITOR'] },
     { href: '/admin/media', label: 'Media', roles: ['ADMIN', 'EDITOR', 'AUTHOR'] },
