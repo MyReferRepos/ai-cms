@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS "comments" (
     "authorId" TEXT,
     "guestName" TEXT,
     "guestEmail" TEXT,
+    "parentId" TEXT,
 
     CONSTRAINT "comments_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "comments_author_or_guest_check" CHECK (
@@ -153,6 +154,9 @@ CREATE INDEX IF NOT EXISTS "comments_postId_idx" ON "comments"("postId");
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "comments_authorId_idx" ON "comments"("authorId");
 
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "comments_parentId_idx" ON "comments"("parentId");
+
 -- AddForeignKey
 DO $$ BEGIN
  ALTER TABLE "posts" ADD CONSTRAINT "posts_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -198,6 +202,13 @@ END $$;
 -- AddForeignKey
 DO $$ BEGIN
  ALTER TABLE "comments" ADD CONSTRAINT "comments_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+-- AddForeignKey
+DO $$ BEGIN
+ ALTER TABLE "comments" ADD CONSTRAINT "comments_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "comments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;

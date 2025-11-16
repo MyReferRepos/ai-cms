@@ -9,7 +9,7 @@ import {
 } from '@/lib/anti-spam';
 
 /**
- * 评论创建请求的验证 schema（支持匿名评论）
+ * 评论创建请求的验证 schema（支持匿名评论+回复）
  */
 const createCommentSchema = z.object({
   postId: z.string().min(1, 'Post ID is required'),
@@ -17,6 +17,8 @@ const createCommentSchema = z.object({
   // For anonymous users
   guestName: z.string().optional(),
   guestEmail: z.string().email().optional().or(z.literal('')),
+  // For replies
+  parentId: z.string().optional(), // 如果是回复，指定父评论ID
   // 反垃圾字段
   honeypot: z.string().optional(), // 应该为空
   timestamp: z.number().optional(), // 表单生成时间
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { postId, content, guestName, guestEmail, honeypot, timestamp } = validationResult.data;
+    const { postId, content, guestName, guestEmail, parentId, honeypot, timestamp } = validationResult.data;
 
     // ===== 反垃圾检查 =====
     const clientIP = getClientIP(request);
@@ -107,6 +109,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ===== 验证父评论（如果是回复）=====
+    if (parentId) {
+      const parentComment = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true, postId: true, approved: true },
+      });
+
+      if (!parentComment) {
+        return NextResponse.json(
+          { error: 'Parent comment not found' },
+          { status: 404 }
+        );
+      }
+
+      // 确保父评论属于同一篇文章
+      if (parentComment.postId !== postId) {
+        return NextResponse.json(
+          { error: 'Parent comment does not belong to this post' },
+          { status: 400 }
+        );
+      }
+
+      // 只允许回复已批准的评论
+      if (!parentComment.approved) {
+        return NextResponse.json(
+          { error: 'Cannot reply to unapproved comment' },
+          { status: 403 }
+        );
+      }
+    }
+
     // ===== 创建评论 =====
     let autoApprove = false;
 
@@ -126,6 +159,11 @@ export async function POST(request: NextRequest) {
       postId,
       approved: autoApprove,
     };
+
+    // 如果是回复，添加parentId
+    if (parentId) {
+      commentData.parentId = parentId;
+    }
 
     if (isAnonymous) {
       // 匿名评论
@@ -210,7 +248,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 构建查询条件
-    const where: any = {};
+    const where: any = {
+      parentId: null, // 只获取顶级评论
+    };
 
     if (postId) {
       where.postId = postId;
@@ -220,7 +260,54 @@ export async function GET(request: NextRequest) {
       where.approved = true;
     }
 
-    // 获取评论
+    // 递归包含回复的函数
+    const includeReplies: any = {
+      where: includeUnapproved ? {} : { approved: true },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+        replies: {
+          where: includeUnapproved ? {} : { approved: true },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
+            },
+            replies: {
+              where: includeUnapproved ? {} : { approved: true },
+              include: {
+                author: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: 'asc',
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    };
+
+    // 获取评论（只获取顶级评论，带嵌套回复）
     const comments = await prisma.comment.findMany({
       where,
       include: {
@@ -238,6 +325,7 @@ export async function GET(request: NextRequest) {
             slug: true,
           },
         },
+        replies: includeReplies,
       },
       orderBy: {
         createdAt: 'desc',

@@ -19,6 +19,7 @@ interface Comment {
   } | null;
   guestName?: string | null;
   guestEmail?: string | null;
+  replies?: Comment[];
 }
 
 interface PostCommentsDialogProps {
@@ -154,6 +155,110 @@ export default function PostCommentsDialog({
     return 'Anonymous';
   };
 
+  // 递归渲染评论（支持嵌套回复）
+  const CommentItem = ({ comment, depth = 0 }: { comment: Comment; depth?: number }) => {
+    return (
+      <div className={depth > 0 ? 'ml-6 mt-3 border-l-2 border-gray-300 dark:border-gray-600 pl-4' : ''}>
+        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+          <div className="flex items-start justify-between">
+            {/* 评论内容 */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="flex items-center space-x-2">
+                  {comment.author?.image && (
+                    <img
+                      src={comment.author.image}
+                      alt={getDisplayName(comment)}
+                      className="w-6 h-6 rounded-full"
+                    />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {getDisplayName(comment)}
+                      {comment.guestName && (
+                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                          (Guest)
+                        </span>
+                      )}
+                      {depth > 0 && (
+                        <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
+                          (Reply)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 状态 */}
+                <span
+                  className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    comment.approved
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}
+                >
+                  {comment.approved ? 'Approved' : 'Pending'}
+                </span>
+              </div>
+
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 whitespace-pre-wrap">
+                {comment.content}
+              </p>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {formatDate(comment.createdAt)}
+                {comment.guestEmail && ` • ${comment.guestEmail}`}
+              </p>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex flex-col space-y-1 ml-4">
+              {!comment.approved && (
+                <Button
+                  size="sm"
+                  onClick={() => handleApprove(comment.id)}
+                  disabled={processingId === comment.id}
+                  className="bg-green-600 hover:bg-green-700 text-xs"
+                >
+                  Approve
+                </Button>
+              )}
+              {comment.approved && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleReject(comment.id)}
+                  disabled={processingId === comment.id}
+                  className="text-xs"
+                >
+                  Unapprove
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleDelete(comment.id)}
+                disabled={processingId === comment.id}
+                className="text-xs"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 递归渲染回复 */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="mt-3 space-y-3">
+            {comment.replies.map((reply) => (
+              <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onClose={onClose} title={`Comments on "${postTitle}"`} size="xl">
       <div className="space-y-4">
@@ -185,91 +290,7 @@ export default function PostCommentsDialog({
         {!loading && comments.length > 0 && (
           <div className="space-y-4">
             {comments.map((comment) => (
-              <div
-                key={comment.id}
-                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              >
-                <div className="flex items-start justify-between">
-                  {/* 评论内容 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <div className="flex items-center space-x-2">
-                        {comment.author?.image && (
-                          <img
-                            src={comment.author.image}
-                            alt={getDisplayName(comment)}
-                            className="w-6 h-6 rounded-full"
-                          />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {getDisplayName(comment)}
-                            {comment.guestName && (
-                              <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-                                (Guest)
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* 状态 */}
-                      <span
-                        className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                          comment.approved
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        }`}
-                      >
-                        {comment.approved ? 'Approved' : 'Pending'}
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 whitespace-pre-wrap">
-                      {comment.content}
-                    </p>
-
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDate(comment.createdAt)}
-                      {comment.guestEmail && ` • ${comment.guestEmail}`}
-                    </p>
-                  </div>
-
-                  {/* 操作按钮 */}
-                  <div className="flex flex-col space-y-1 ml-4">
-                    {!comment.approved && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(comment.id)}
-                        disabled={processingId === comment.id}
-                        className="bg-green-600 hover:bg-green-700 text-xs"
-                      >
-                        Approve
-                      </Button>
-                    )}
-                    {comment.approved && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReject(comment.id)}
-                        disabled={processingId === comment.id}
-                        className="text-xs"
-                      >
-                        Unapprove
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(comment.id)}
-                      disabled={processingId === comment.id}
-                      className="text-xs"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <CommentItem key={comment.id} comment={comment} depth={0} />
             ))}
           </div>
         )}
